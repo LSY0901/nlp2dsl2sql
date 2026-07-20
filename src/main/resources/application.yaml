@@ -1,0 +1,12 @@
+server:
+  port: 8079
+
+spring:
+  application:
+    name: Nlp2dsl2sql
+
+agentscope:
+  openai:
+    api-key:
+    base-url:
+    model-name:
