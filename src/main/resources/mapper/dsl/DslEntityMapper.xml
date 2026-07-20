@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.nlp2dsl2sql.mapper.dsl.DslEntityMapper">
+    <select id="selectAll" resultType="org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslEntity">
+        SELECT id, entity_code, entity_name, entity_type, physical_table, primary_key, description,
+               is_deleted, creator, created_dt, last_editor, last_edited_dt
+        FROM agent.dsl_entity WHERE is_deleted = false
+    </select>
+    <select id="selectByEntityCode" resultType="org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslEntity">
+        SELECT id, entity_code, entity_name, entity_type, physical_table, primary_key, description,
+               is_deleted, creator, created_dt, last_editor, last_edited_dt
+        FROM agent.dsl_entity WHERE entity_code = #{entityCode} AND is_deleted = false
+    </select>
+    <select id="selectByEntityCodes" resultType="org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslEntity">
+        SELECT id, entity_code, entity_name, entity_type, physical_table, primary_key, description,
+               is_deleted, creator, created_dt, last_editor, last_edited_dt
+        FROM agent.dsl_entity WHERE is_deleted = false AND entity_code IN
+        <foreach collection="list" item="code" open="(" separator="," close=")">#{code}</foreach>
+    </select>
+    <select id="selectWithNullEmbedding" resultType="org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslEntity">
+        SELECT id, entity_code, entity_name, description
+        FROM agent.dsl_entity
+        WHERE is_deleted = false AND embedding IS NULL
+    </select>
+    <update id="updateEmbedding">
+        UPDATE agent.dsl_entity
+        SET embedding = #{vector}::public.vector
+        WHERE id = #{id}
+    </update>
+</mapper>

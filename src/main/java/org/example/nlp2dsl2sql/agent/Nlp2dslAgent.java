@@ -12,7 +12,7 @@ import java.nio.file.Paths;
 public class Nlp2dslAgent {
 
     @Bean
-    public HarnessAgent nlp2dslAgent(OpenAIChatModel model) {
+    public HarnessAgent nlp2dsl2sqlAgent(OpenAIChatModel model) {
         return HarnessAgent.builder()
                 .name("NLP2DSL2SQL")
                 .sysPrompt(

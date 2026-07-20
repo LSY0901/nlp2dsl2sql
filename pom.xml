@@ -30,13 +30,6 @@
             <version>${agentscope.version}</version>
         </dependency>
 
-        <!--        &lt;!&ndash;qwen 扩展&ndash;&gt;-->
-        <!--        <dependency>-->
-        <!--            <groupId>io.agentscope</groupId>-->
-        <!--            <artifactId>agentscope-extensions-model-dashscope</artifactId>-->
-        <!--            <version>${agentscope.version}</version>-->
-        <!--        </dependency>-->
-
         <!--openai 兼容DeepSeek、Kimi、GLM等 模型扩展-->
         <dependency>
             <groupId>io.agentscope</groupId>
@@ -50,7 +43,6 @@
             <artifactId>agentscope-openai-spring-boot-starter</artifactId>
             <version>${agentscope.version}</version>
         </dependency>
-
 
         <!-- Spring Boot Web -->
         <dependency>
@@ -70,7 +62,6 @@
             <artifactId>postgresql</artifactId>
         </dependency>
 
-
         <!-- lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>
@@ -85,7 +76,6 @@
             <version>3.5.7</version>
         </dependency>
 
-
         <!-- pgvector JDBC 驱动 -->
         <dependency>
             <groupId>com.pgvector</groupId>
@@ -93,13 +83,11 @@
             <version>0.1.4</version>
         </dependency>
 
-
         <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>fastjson</artifactId>
             <version>2.0.40</version>
         </dependency>
-
 
     </dependencies>
 

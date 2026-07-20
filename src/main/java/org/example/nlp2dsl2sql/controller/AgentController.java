@@ -14,8 +14,8 @@ public class AgentController {
 
     private final HarnessAgent agent;
 
-    public AgentController(HarnessAgent nlp2dslAgent){
-        this.agent = nlp2dslAgent;
+    public AgentController(HarnessAgent nlp2dsl2sqlAgent){
+        this.agent = nlp2dsl2sqlAgent;
     }
 
     @GetMapping("/chat")

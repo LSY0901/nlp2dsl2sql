@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.nlp2dsl2sql.mapper.dsl.DslAttributeMapper">
+    <select id="selectByEntityCode" resultType="org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslAttribute">
+        SELECT id, entity_code, attribute_code, attribute_name, physical_column, data_type,
+               attribute_type, description, is_queryable, is_aggregatable,
+               is_deleted, creator, created_dt, last_editor, last_edited_dt
+        FROM agent.dsl_attribute WHERE entity_code = #{entityCode} AND is_deleted = false
+    </select>
+    <select id="selectByEntityCodes" resultType="org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslAttribute">
+        SELECT id, entity_code, attribute_code, attribute_name, physical_column, data_type,
+               attribute_type, description, is_queryable, is_aggregatable,
+               is_deleted, creator, created_dt, last_editor, last_edited_dt
+        FROM agent.dsl_attribute WHERE is_deleted = false AND entity_code IN
+        <foreach collection="list" item="code" open="(" separator="," close=")">#{code}</foreach>
+    </select>
+    <select id="selectWithNullEmbedding" resultType="org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslAttribute">
+        SELECT a.id, a.attribute_name, a.description, e.entity_name AS entity_name
+        FROM agent.dsl_attribute a
+        LEFT JOIN agent.dsl_entity e
+            ON a.entity_code = e.entity_code AND e.is_deleted = false
+        WHERE a.is_deleted = false AND a.embedding IS NULL
+    </select>
+    <update id="updateEmbedding">
+        UPDATE agent.dsl_attribute
+        SET embedding = #{vector}::public.vector
+        WHERE id = #{id}
+    </update>
+</mapper>

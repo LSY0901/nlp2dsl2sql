@@ -4,9 +4,36 @@ server:
 spring:
   application:
     name: Nlp2dsl2sql
+  datasource:
+    url: jdbc:postgresql://localhost:5432/agent_db?options=-c%20search_path%3Dagent%2Cpublic
+    username: agent_user
+    password: 123456
 
 agentscope:
+  model:
+    provider: openai
   openai:
     api-key:
-    base-url:
-    model-name:
+    base-url: https://api.deepseek.com
+    model-name: deepseek-v4-pro
+
+embedding:
+  base-url: http://localhost:8082
+  model: bge-m3
+
+rerank:
+  base-url: http://localhost:8083
+  model: bge-reranker-v2-m3
+
+logging:
+  level:
+    org.example.nlp2dsl2sql: debug
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  mapper-locations: classpath:/mapper/**/*.xml
+
+dsl:
+  translator:
+    dialect: postgresql

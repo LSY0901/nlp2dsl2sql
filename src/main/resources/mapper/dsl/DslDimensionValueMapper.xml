@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.nlp2dsl2sql.mapper.dsl.DslDimensionValueMapper">
+    <select id="selectByDimensionCode" resultType="org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslDimensionValue">
+        SELECT id, dimension_code, value_code, value_name, physical_value, description,
+               is_deleted, creator, created_dt, last_editor, last_edited_dt
+        FROM agent.dsl_dimension_value WHERE dimension_code = #{dimensionCode} AND is_deleted = false
+    </select>
+    <select id="selectByDimensionCodes" resultType="org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslDimensionValue">
+        SELECT id, dimension_code, value_code, value_name, physical_value, description,
+               is_deleted, creator, created_dt, last_editor, last_edited_dt
+        FROM agent.dsl_dimension_value WHERE is_deleted = false AND dimension_code IN
+        <foreach collection="dimensionCodes" item="code" open="(" separator="," close=")">#{code}</foreach>
+    </select>
+    <select id="selectWithNullEmbedding" resultType="org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslDimensionValue">
+        SELECT v.id, v.value_name, v.description, d.dimension_name AS dimension_name
+        FROM agent.dsl_dimension_value v
+        LEFT JOIN agent.dsl_dimension d
+            ON v.dimension_code = d.dimension_code AND d.is_deleted = false
+        WHERE v.is_deleted = false AND v.embedding IS NULL
+    </select>
+    <update id="updateEmbedding">
+        UPDATE agent.dsl_dimension_value
+        SET embedding = #{vector}::public.vector
+        WHERE id = #{id}
+    </update>
+</mapper>

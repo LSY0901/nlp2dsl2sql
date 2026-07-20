@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.nlp2dsl2sql.mapper.dsl.DslSynonymMapper">
+    <select id="selectAll" resultType="org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslSynonym">
+        SELECT id, synonym_text, object_type, object_code, standard_name, description,
+               is_deleted, creator, created_dt, last_editor, last_edited_dt
+        FROM agent.dsl_synonym WHERE is_deleted = false
+    </select>
+    <select id="selectBySynonymText" resultType="org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslSynonym">
+        SELECT id, synonym_text, object_type, object_code, standard_name, description,
+               is_deleted, creator, created_dt, last_editor, last_edited_dt
+        FROM agent.dsl_synonym WHERE synonym_text = #{synonymText} AND is_deleted = false
+    </select>
+    <select id="selectVectorSearch" resultType="string">
+        SELECT object_code FROM agent.dsl_synonym
+        WHERE is_deleted = false AND embedding IS NOT NULL
+        ORDER BY embedding &lt;=&gt; #{vector}::vector
+        LIMIT #{limit}
+    </select>
+    <select id="selectVectorSearchRows" resultType="org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslSynonym">
+        SELECT id, synonym_text, object_type, object_code, standard_name, description
+        FROM agent.dsl_synonym
+        WHERE is_deleted = false AND embedding IS NOT NULL
+        ORDER BY embedding &lt;=&gt; #{vector}::vector
+        LIMIT #{limit}
+    </select>
+    <select id="selectWithNullEmbedding" resultType="org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslSynonym">
+        SELECT id, synonym_text, standard_name, description
+        FROM agent.dsl_synonym
+        WHERE is_deleted = false AND embedding IS NULL
+    </select>
+    <update id="updateEmbedding">
+        UPDATE agent.dsl_synonym
+        SET embedding = #{vector}::public.vector
+        WHERE id = #{id}
+    </update>
+</mapper>

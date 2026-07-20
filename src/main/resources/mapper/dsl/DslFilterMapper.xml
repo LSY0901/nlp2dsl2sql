@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.nlp2dsl2sql.mapper.dsl.DslFilterMapper">
+    <select id="selectSystemFiltersByEntityCode" resultType="org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslFilter">
+        SELECT id, filter_code, filter_name, entity_code, attribute_code, operator_type, expression,
+               description, is_system, is_deleted, creator, created_dt, last_editor, last_edited_dt
+        FROM agent.dsl_filter WHERE entity_code = #{entityCode} AND is_system = true AND is_deleted = false
+    </select>
+    <select id="selectByEntityCode" resultType="org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslFilter">
+        SELECT id, filter_code, filter_name, entity_code, attribute_code, operator_type, expression,
+               description, is_system, is_deleted, creator, created_dt, last_editor, last_edited_dt
+        FROM agent.dsl_filter WHERE entity_code = #{entityCode} AND is_deleted = false
+    </select>
+    <select id="selectWithNullEmbedding" resultType="org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslFilter">
+        SELECT id, filter_name, description
+        FROM agent.dsl_filter
+        WHERE is_deleted = false AND embedding IS NULL
+    </select>
+    <update id="updateEmbedding">
+        UPDATE agent.dsl_filter
+        SET embedding = #{vector}::public.vector
+        WHERE id = #{id}
+    </update>
+</mapper>
