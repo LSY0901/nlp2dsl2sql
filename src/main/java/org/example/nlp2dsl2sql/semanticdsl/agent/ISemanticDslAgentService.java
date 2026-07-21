@@ -1,6 +1,5 @@
 package org.example.nlp2dsl2sql.semanticdsl.agent;
 
-import org.example.nlp2dsl2sql.semanticdsl.model.EnrichedQueryDSL;
 import org.example.nlp2dsl2sql.semanticdsl.model.IntentResult;
 import reactor.core.publisher.Flux;
 

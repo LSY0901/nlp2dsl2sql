@@ -1,11 +1,11 @@
 package org.example.nlp2dsl2sql.semanticdsl.retriever;
 
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.nlp2dsl2sql.config.EmbeddingClient;
 import org.example.nlp2dsl2sql.semanticdsl.metadata.IDslMetaDataService;
 import org.example.nlp2dsl2sql.semanticdsl.metadata.entity.*;
 import org.example.nlp2dsl2sql.semanticdsl.model.DslCandidate;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -32,22 +32,31 @@ public class DslRetriever {
         String vectorStr = EmbeddingClient.toVectorStr(questionVector);
 
         int recallTopN = 10;
+        //语义识别匹配
         List<String> metricCodes = new ArrayList<>(
                 metaDataService.searchMetricsByVector(vectorStr, recallTopN));
+        //查询的维度匹配
         List<String> dimensionCodes = new ArrayList<>(
                 metaDataService.searchDimensionsByVector(vectorStr, recallTopN));
+        //业务同义词匹配
         List<DslSynonym> hitSynonyms =
                 metaDataService.searchSynonymRowsByVector(vectorStr, recallTopN);
         log.info("向量召回: metrics={}, dimensions={}, synonyms={}",
                 metricCodes.size(), dimensionCodes.size(), hitSynonyms.size());
 
+        //维度和语义扩展 根据业务同义词扩展
         expandBySynonyms(question, hitSynonyms, metricCodes, dimensionCodes);
 
+
+        //多语义匹配
         List<DslMetric> candidateMetrics = metaDataService.getMetricsByCodes(metricCodes);
+        //多维度匹配
         List<DslDimension> candidateDimensions =
                 metaDataService.getDimensionsByCodes(dimensionCodes);
 
+        //语义reranker
         List<DslMetric> rerankedMetrics = rerankMetrics(question, candidateMetrics);
+        //维度reranker
         List<DslDimension> rerankedDimensions = rerankDimensions(question, candidateDimensions);
 
         if (isCountQuestion(question)) {
@@ -55,8 +64,10 @@ public class DslRetriever {
         }
 
         int topK = 3;
+        //取top3
         List<DslMetric> topMetrics = rerankedMetrics.stream()
                 .limit(topK).collect(Collectors.toList());
+        //取top6
         List<DslDimension> topDimensions = rerankedDimensions.stream()
                 .limit(topK * 2L).collect(Collectors.toList());
 
@@ -76,7 +87,9 @@ public class DslRetriever {
                 entityCodes.add(d.getEntityCode());
             }
         }
+        //获取所有关系
         List<DslRelation> relations = metaDataService.getAllRelations();
+
         entityCodes.addAll(collectBridgeEntities(entityCodes, relations));
 
         List<DslEntity> entities =
@@ -177,8 +190,11 @@ public class DslRetriever {
             }
             String type = s.getObjectType().trim().toUpperCase();
             switch (type) {
+                //语义
                 case "METRIC" -> metricSet.add(s.getObjectCode());
+                //维度
                 case "DIMENSION" -> dimensionSet.add(s.getObjectCode());
+                //实体
                 case "ENTITY" -> entityCodes.add(s.getObjectCode());
                 default -> log.debug("忽略未知同义词类型: {}", type);
             }

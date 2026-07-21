@@ -15,10 +15,12 @@
     </select>
     <select id="selectByMetricCodes" resultType="org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslMetric">
         SELECT id, metric_code, metric_name, metric_type, entity_code,
-               aggregation_type, expression, unit, precision_value, result_type, description,
-               is_deleted, creator, created_dt, last_editor, last_edited_dt
+        aggregation_type, expression, unit, precision_value, result_type, description,
+        is_deleted, creator, created_dt, last_editor, last_edited_dt
         FROM agent.dsl_metric WHERE is_deleted = false AND metric_code IN
-        <foreach collection="metricCodes" item="code" open="(" separator="," close=")">#{code}</foreach>
+        <foreach collection="metricCodes" item="code" open="(" separator="," close=")">
+            #{code}
+        </foreach>
     </select>
     <select id="selectVectorSearch" resultType="string">
         SELECT metric_code FROM agent.dsl_metric

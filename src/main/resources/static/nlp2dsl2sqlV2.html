@@ -218,11 +218,47 @@
         }
 
         .welcome h2 { color: #555; font-size: 20px; margin-bottom: 8px; }
+
+        .mode-switch {
+            display: inline-flex;
+            gap: 4px;
+            background: #f3f4f6;
+            border-radius: 10px;
+            padding: 3px;
+            margin-left: 12px;
+        }
+
+        .mode-btn {
+            border: none;
+            background: transparent;
+            color: #6b7280;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 5px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .mode-btn.active {
+            background: #4f46e5;
+            color: #fff;
+        }
+
+        .mode-btn:not(.active):hover {
+            background: #e5e7eb;
+        }
     </style>
 </head>
 <body>
 
-<header>NLP2DSL2SQL 数据分析助手-agent</header>
+<header>
+    NLP2DSL2SQL 数据分析助手
+    <div class="mode-switch">
+        <button class="mode-btn active" id="modeWorkflow" onclick="switchMode('workflow')">V2 Workflow</button>
+        <button class="mode-btn" id="modeMultiAgent" onclick="switchMode('multiAgent')">多 Agent</button>
+    </div>
+</header>
 
 <div class="chat-container" id="chatContainer">
     <div class="welcome">
@@ -247,6 +283,21 @@
     const userInput = document.getElementById('userInput');
     const sendBtn = document.getElementById('sendBtn');
     let isStreaming = false;
+    let currentMode = 'workflow';
+
+    function switchMode(mode) {
+        currentMode = mode;
+        document.getElementById('modeWorkflow').classList.toggle('active', mode === 'workflow');
+        document.getElementById('modeMultiAgent').classList.toggle('active', mode === 'multiAgent');
+        userInput.focus();
+    }
+
+    function getApiEndpoint() {
+        if (currentMode === 'multiAgent') {
+            return `${API_BASE_URL}/aiChat/nlp2Dsl2SqlMultiAgent`;
+        }
+        return `${API_BASE_URL}/aiChat/nlp2Dsl2SqlAgentV2`;
+    }
 
     if (API_BASE) {
         const tip = document.createElement('div');
@@ -366,7 +417,7 @@
         const bubble = addStreamingMessage();
         let fullText = '';
         try {
-            const url = `${API_BASE_URL}/aiChat/nlp2Dsl2SqlAgentV2?question=${encodeURIComponent(text)}`;
+            const url = `${getApiEndpoint()}?question=${encodeURIComponent(text)}`;
             const resp = await fetch(url);
             if (!resp.ok) {
                 const errText = await resp.text().catch(() => '');

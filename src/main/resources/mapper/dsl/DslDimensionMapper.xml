@@ -2,31 +2,63 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.example.nlp2dsl2sql.mapper.dsl.DslDimensionMapper">
     <select id="selectAll" resultType="org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslDimension">
-        SELECT id, dimension_code, dimension_name, entity_code, attribute_code, dimension_type,
-               physical_column, description, is_queryable, is_deleted, creator, created_dt, last_editor, last_edited_dt
-        FROM agent.dsl_dimension WHERE is_deleted = false
+        SELECT id,
+               dimension_code,
+               dimension_name,
+               entity_code,
+               attribute_code,
+               dimension_type,
+               physical_column,
+               description,
+               is_queryable,
+               is_deleted,
+               creator,
+               created_dt,
+               last_editor,
+               last_edited_dt
+        FROM agent.dsl_dimension
+        WHERE is_deleted = false
     </select>
     <select id="selectByDimensionCode" resultType="org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslDimension">
-        SELECT id, dimension_code, dimension_name, entity_code, attribute_code, dimension_type,
-               physical_column, description, is_queryable, is_deleted, creator, created_dt, last_editor, last_edited_dt
-        FROM agent.dsl_dimension WHERE dimension_code = #{dimensionCode} AND is_deleted = false
+        SELECT id,
+               dimension_code,
+               dimension_name,
+               entity_code,
+               attribute_code,
+               dimension_type,
+               physical_column,
+               description,
+               is_queryable,
+               is_deleted,
+               creator,
+               created_dt,
+               last_editor,
+               last_edited_dt
+        FROM agent.dsl_dimension
+        WHERE dimension_code = #{dimensionCode}
+          AND is_deleted = false
     </select>
     <select id="selectByDimensionCodes" resultType="org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslDimension">
         SELECT id, dimension_code, dimension_name, entity_code, attribute_code, dimension_type,
-               physical_column, description, is_queryable, is_deleted, creator, created_dt, last_editor, last_edited_dt
+        physical_column, description, is_queryable, is_deleted, creator, created_dt, last_editor, last_edited_dt
         FROM agent.dsl_dimension WHERE is_deleted = false AND dimension_code IN
-        <foreach collection="dimensionCodes" item="code" open="(" separator="," close=")">#{code}</foreach>
+        <foreach collection="dimensionCodes" item="code" open="(" separator="," close=")">
+            #{code}
+        </foreach>
     </select>
     <select id="selectVectorSearch" resultType="string">
-        SELECT dimension_code FROM agent.dsl_dimension
-        WHERE is_deleted = false AND embedding IS NOT NULL
+        SELECT dimension_code
+        FROM agent.dsl_dimension
+        WHERE is_deleted = false
+          AND embedding IS NOT NULL
         ORDER BY embedding &lt;=&gt; #{vector}::vector
-        LIMIT #{limit}
+            LIMIT #{limit}
     </select>
     <select id="selectWithNullEmbedding" resultType="org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslDimension">
         SELECT id, dimension_code, dimension_name, description
         FROM agent.dsl_dimension
-        WHERE is_deleted = false AND embedding IS NULL
+        WHERE is_deleted = false
+          AND embedding IS NULL
     </select>
     <update id="updateEmbedding">
         UPDATE agent.dsl_dimension
