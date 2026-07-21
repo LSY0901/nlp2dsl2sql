@@ -43,6 +43,12 @@ public class MultiAgentController {
      * @param request 包含用户问题的请求
      * @return SSE 流式响应（文本增量）
      */
+
+    /**
+     * 这里不是多agent。是一个单agent + 多工具的ReAct
+     * @param request
+     * @return
+     */
     @GetMapping(value = "/nlp2Dsl2SqlMultiAgent", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> multiAgentChat(Nlp2DslAgentRequest request) {
         return multiAgentService.multiAgentQuery(request.getQuestion());

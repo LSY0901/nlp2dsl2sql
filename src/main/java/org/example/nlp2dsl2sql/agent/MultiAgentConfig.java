@@ -102,6 +102,7 @@ public class MultiAgentConfig {
                 .sysPrompt(SUPERVISOR_PROMPT)
                 .model(model)
                 .toolkit(toolkit)
+                // 最多 15 轮
                 .maxIters(15)
                 .workspace(Paths.get(".agentscope/workspace"))
                 // 关闭与 NLP→SQL 无关的内置工具，避免干扰业务 ReAct。
