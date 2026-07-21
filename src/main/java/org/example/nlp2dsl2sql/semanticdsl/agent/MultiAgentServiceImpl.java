@@ -31,16 +31,16 @@ import java.util.UUID;
 @Service
 public class MultiAgentServiceImpl implements IMultiAgentService {
 
-    private final HarnessAgent supervisorAgent;
+    private final HarnessAgent nlp2dsl2sqlAgent;
 
     /**
      * 构造多 Agent 服务。
      *
-     * @param supervisorAgent Supervisor HarnessAgent（带业务 Toolkit）
+     * @param nlp2dsl2sqlAgent
      */
     public MultiAgentServiceImpl(
-            @Qualifier("supervisorAgent") HarnessAgent supervisorAgent) {
-        this.supervisorAgent = supervisorAgent;
+            @Qualifier("nlp2dsl2sqlAgent") HarnessAgent nlp2dsl2sqlAgent) {
+        this.nlp2dsl2sqlAgent = nlp2dsl2sqlAgent;
     }
 
     /**
@@ -70,7 +70,7 @@ public class MultiAgentServiceImpl implements IMultiAgentService {
 
         log.info("━━━━━━━ HarnessAgent 流式 ReAct 启动 ━━━━━━━");
 
-        return supervisorAgent
+        return nlp2dsl2sqlAgent
                 .streamEvents(new UserMessage(trimmed), ctx)
                 .mapNotNull(this::mapEventToSseChunk)
                 .doOnNext(chunk -> {
