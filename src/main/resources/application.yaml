@@ -13,7 +13,7 @@ agentscope:
   model:
     provider: openai
   openai:
-    api-key:
+    api-key: sk-51f1c38aa5e0436db2c623337a8d9f83
     base-url: https://api.deepseek.com
     model-name: deepseek-v4-pro
 

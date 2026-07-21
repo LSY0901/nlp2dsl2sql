@@ -1,17 +1,20 @@
 package org.example.nlp2dsl2sql.agent;
 
+import org.example.nlp2dsl2sql.semanticdsl.tools.MultiAgentToolRegistry;
 import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import io.agentscope.harness.agent.HarnessAgent;
 import io.agentscope.harness.agent.memory.compaction.CompactionConfig;
+import io.agentscope.core.tool.Toolkit;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.nio.file.Paths;
 
 /**
- * 多 Agent 配置 — 基于 AgentScope Harness 的多 Agent 架构。
+ * 多 Agent 配置 — 基于 AgentScope Harness 的 Supervisor + Toolkit 架构。
  * <p>
- * 创建 Supervisor Agent，通过 ReAct 循环自主决策调用哪些工具、以什么顺序执行。
+ * Supervisor 通过框架内置 ReAct 循环调用 {@link MultiAgentToolRegistry} 中
+ * 以 {@code @Tool} 注解注册的业务工具。
  */
 @Configuration
 public class MultiAgentConfig {
@@ -35,12 +38,13 @@ public class MultiAgentConfig {
                - DETAIL_QUERY: 查询明细数据
                - NON_BUSINESS: 非业务问题，直接回答
 
-            2. 如果是非业务问题，直接调用 finish 工具回答用户。
+            2. 如果是非业务问题，直接用自然语言回答用户，不要调用业务工具。
 
             3. 调用 retrieve_metadata 检索相关元数据（指标、维度、实体）
 
             4. 基于候选元数据，在推理中直接生成语义 DSL JSON：
-               {"metric":"指标code","entity":"实体code","dimensions":["维度code"],"filters":[{"dimension":"维度code","value":"维度值code"}]}
+               {"metric":"指标code","entity":"实体code","dimensions":["维度code"],\
+            "filters":[{"dimension":"维度code","value":"维度值code"}]}
                规则：
                - metric/entity/dimensions 必须从候选元数据中选择，禁止编造
                - 「有多少/几个/数量」选 student_count 等计数指标
@@ -57,7 +61,7 @@ public class MultiAgentConfig {
 
             9. 调用 execute_sql 执行查询（传入 SQL 和参数列表）
 
-            10. 调用 finish 工具，传入最终的自然语言回答
+            10. 基于查询结果，直接用自然语言给出最终回答（不要再调用工具）
 
             ## 重要规则
 
@@ -65,6 +69,7 @@ public class MultiAgentConfig {
             - 仔细阅读工具返回的结果，根据结果决定下一步
             - 如果某一步失败，分析错误原因并尝试修正
             - 最终回答要简洁，只输出结论本身
+            - 不要调用与业务无关的内置工具（文件、Shell、记忆等）
             """;
 
     // ==================== 旧版 Agent Prompt 常量（保留兼容） ====================
@@ -79,16 +84,38 @@ public class MultiAgentConfig {
     /**
      * Supervisor Agent — 多 Agent 系统的核心编排者。
      * <p>
-     * 通过 ReAct 循环（推理→工具调用→观察结果→再推理）自主编排全流程。
-     * 工具函数定义在 {@link org.example.nlp2dsl2sql.semanticdsl.tools.MultiAgentToolRegistry}。
+     * 将 {@link MultiAgentToolRegistry} 注册到 Toolkit，由 HarnessAgent
+     * 内置 ReAct 循环自动完成 tool_call → 执行 → observation。
+     *
+     * @param model        LLM 模型
+     * @param toolRegistry 带 {@code @Tool} 注解的业务工具 Bean
+     * @return Supervisor HarnessAgent
      */
     @Bean
-    public HarnessAgent supervisorAgent(OpenAIChatModel model) {
+    public HarnessAgent supervisorAgent(OpenAIChatModel model,
+                                        MultiAgentToolRegistry toolRegistry) {
+        Toolkit toolkit = new Toolkit();
+        toolkit.registerTool(toolRegistry);
+
         return HarnessAgent.builder()
-                .name("Supervisor")
+                .name("nlp2dsl2sqlAgent")
                 .sysPrompt(SUPERVISOR_PROMPT)
                 .model(model)
+                .toolkit(toolkit)
+                .maxIters(15)
                 .workspace(Paths.get(".agentscope/workspace"))
+                // 关闭与 NLP→SQL 无关的内置工具，避免干扰业务 ReAct。
+                // 注意：不要 disableMemoryHooks —— 会话 JSONL / MEMORY 写入依赖它。
+//                .disableFilesystemTools()
+//                .disableShellTool()
+//                .disableMemoryTools()
+//                .disableSubagents()
+//                .disableDynamicSubagents()
+//                .disableDynamicSkills()
+//                .disableDefaultWorkspaceSkills()
+//                .disableWorkspaceContext()
+//                .disableAtPathExpansion()
+//                .disableToolsConfig()
                 .compaction(CompactionConfig.builder()
                         .triggerMessages(30)
                         .keepMessages(10)

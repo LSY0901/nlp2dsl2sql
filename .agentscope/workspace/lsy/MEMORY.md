@@ -1,22 +1,66 @@
 # MEMORY.md
 
-- **用户称呼**：Leo（曾用名天宇，已确认 Leo）
-- **核心项目**：`Nlp2dsl2sql` — 自然语言 → DSL → SQL 多步语义解析与生成
-- **项目技术栈**：Java 21 + Spring Boot 3.5.15，AgentScope 2.0（Harness + OpenAI 扩展），DeepSeek v4-pro（OpenAI 兼容 API），PostgreSQL + pgvector，MyBatis-Plus；运行端口：8079
-- **当前任务（2026-07-18）**：准备一场 **ReAct (Reasoning + Acting)** 技术分享，强调工程落地到 `Nlp2dsl2sql` 管道中，而非纯理论
-- **工程关注点**：
-  - DSL 解析歧义处理
-  - SQL 生成的可验证性
-  - 错误归因与反思机制
-  - ReAct 在真实 pipeline 中的闭环价值（如处理“最近3天销售额最高的产品”查询）
-- **演示路径设想**：ReAct agent 自主执行 → 意图解析 → 时间范围查询 → DSL 解释器调用 → SQL 生成与验证 → 执行结果反思
-- **可用文档资源**：`knowledge/REACT_ARCHITECTURE.md`、`knowledge/NLP2DSL_SCHEMA.md`
-- **分享准备状态**：目标听众、分享时长、内容侧重（理论/工程/对比/实战）待定；可立即输出 PPT 大纲、最小可运行 ReAct demo（≤50 行，在本项目环境内运行）、关键论文速查表或中英对照讲稿要点
-- **长期方向**：将 ReAct 机制内化为 `Nlp2dsl2sql` 常态的解析‑验证‑纠错循环
-- **测试验证（2026-07-18）**：
-  - 首次测试：`FirstAgent` 成功运行（DeepSeek v4-pro），固定 sessionId `supervisor` 下两轮对话均正确响应，跨轮记忆验证通过；日志提示 `.agentscope/workspace/AGENTS.md` 缺失
-  - 后续运行问题：编译产物与源码不一致导致 API key required；Maven 无法重新构建（阿里云镜像 `maven.aliyun.com` 无响应）；直接运行 fat JAR 需排除 DataSource 和 Web 自动配置参数（`--spring.autoconfigure.exclude=... --spring.main.web-application-type=none`）
-- **已知问题**：再次运行 `FirstAgent` 流式调用时可能遇到 SSL/TLS 握手错误（`SSE/NDJSON stream failed: Remote host terminated the handshake`）。经 `curl` 验证 DeepSeek API 和 `deepseek-v4-pro` 模型均正常，定位为 Java 侧 HTTP 客户端兼容性问题。临时解决方案：切换至 `deepseek-v4-flash` 模型或关闭流式（`.stream(false)`）
-- **待办**：
-  - 补充 `.agentscope/workspace/AGENTS.md` 文件以定义 persona 和本地行为规范
-  - 切换可用 Maven 仓库并重新构建项目，对齐源码与编译产物（解决 FirstAgent 运行时的 API key required 错误）
+## User Identity
+- **User Name**: Leo (previously Tianyu; now using Leo)
+- **Current Date**: 2026-07-21 (Tuesday)
+
+## Core Project: Nlp2dsl2sql
+- **Goal**: Natural language → DSL → SQL multi-step semantic parsing and generation
+- **Tech Stack**: Java 21 + Spring Boot 3.5.15, AgentScope 2.0 (Harness + OpenAI extension), DeepSeek v4-pro (OpenAI‑compatible API), PostgreSQL + pgvector, MyBatis-Plus
+- **Runtime Port**: 8079
+- **Key Engineering Concerns**:
+  - DSL parsing ambiguity resolution
+  - SQL generation verifiability
+  - Error attribution and reflection mechanisms
+  - Closed‑loop value of ReAct in a real pipeline (e.g., handling “top‑selling product in the last 3 days”)
+- **Long‑term Goal**: Embed ReAct as the default parse–verify–correct loop inside Nlp2dsl2sql
+
+## Current Task: ReAct (Reasoning + Acting) Tech Sharing
+- **Focus**: Engineering‑driven, tightly linked to Nlp2dsl2sql; not pure theory
+- **Demo Path**: ReAct agent → intent parsing → time‑range query → DSL interpreter call → SQL generation & verification → execution result reflection
+- **Available Resources**:
+  - Project docs: `knowledge/REACT_ARCHITECTURE.md`, `knowledge/NLP2DSL_SCHEMA.md`
+  - Support I can provide: PPT outline, a ≤50‑line runnable ReAct demo (within project), key paper cheat sheet, bilingual talk points
+- **Status**: Target audience, duration, and emphasis still to be decided; first‑draft outline or demo ready on request
+
+## Testing & Verification
+
+### Agent Memory Test (2026-07-18)
+- **FirstAgent Test (successful)**
+  - Model: DeepSeek v4-pro (streaming)
+  - Fixed sessionId: `supervisor`
+  - Two‑round conversation: user introduced himself (“我叫leo，今天准备开始测试NLP”), second round asked “我叫什么？我今天要干什么？” – agent correctly retained Leo and the test‑NLP task
+  - Cross‑turn memory validation passed
+  - Log warning: `.agentscope/workspace/AGENTS.md` missing (persona/behaviour spec)
+
+### Pipeline Integration Test (2026-07-21)
+- **End‑to‑end query**: User asked “四年级有多少人？” in a conversation.
+- **Successful processing**:
+  - **Intent recognition** → `METRIC_QUERY`
+  - **DSL** → metric `student_count` on entity `student` with filter `grade = grade_4`; DSL validation passed
+  - **SQL generation** → `INNER JOIN`ing `student`, `class`, and `grade` tables correctly produced a single‑row result: `student_count = 4`
+- **Conversation‑level context reuse**: When the user repeated the exact same query in the same conversation, the agent returned the cached previous result instead of re‑running the pipeline. This demonstrates effective reuse of conversation context.
+
+### Compilation & Deployment Notes
+- **Compilation Mismatch (resolved on 2026-07-18)**
+  - Older compiled artifact (`FirstAgent.class`) still referenced DashScope, causing “API key required” when running the fat JAR
+  - **Fix**: Offline Maven build (`mvn package -DskipTests -o`) successfully aligned artifact → JAR now contains `OpenAIChatModel` for DeepSeek, resolving the mismatch
+  - Maven online builds remain broken due to the Alibaba mirror (`maven.aliyun.com:80`) not responding; the offline build is a temporary workaround
+- **Running as fat JAR**: When executing `Nlp2dsl2sql-0.0.1-SNAPSHOT.jar` directly, you must disable DataSource and Web auto‑configuration:
+  ```
+  --spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration --spring.main.web-application-type=none
+  ```
+
+## Known Issues & Workarounds
+- **SSL/TLS handshake error with streaming**
+  - Symptom: “SSE/NDJSON stream failed: Remote host terminated the handshake” during streaming to DeepSeek v4-pro
+  - Root cause: Java HTTP client compatibility issue (curl to same API works fine)
+  - Workarounds:
+    1. Switch model to `deepseek-v4-flash` (no reasoning output)
+    2. Disable streaming: `.stream(false)` on the `OpenAIChatModel` configuration
+- **Maven online build**: Alibaba mirror unreachable; use offline `-o` mode for now, consider switching to Maven Central or a reliable mirror later
+
+## To-Do List
+- [ ] Create `.agentscope/workspace/AGENTS.md` to define persona and local workspace rules
+- [ ] Explore the AgentScope workspace directory structure and identify a suitable official example for running a FirstAgent-like agent (the source code already contains commented‑out official examples); decide which one to adapt
+- [ ] (Lower priority) Configure a stable Maven repository for normal online builds
