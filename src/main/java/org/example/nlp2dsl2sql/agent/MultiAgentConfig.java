@@ -92,7 +92,7 @@ public class MultiAgentConfig {
      * @return Supervisor HarnessAgent
      */
     @Bean
-    public HarnessAgent nlp2dsl2sqlAgent(OpenAIChatModel model,
+    public HarnessAgent nlp2dsl2sqlAgentLatest(OpenAIChatModel model,
                                         MultiAgentToolRegistry toolRegistry) {
         Toolkit toolkit = new Toolkit();
         toolkit.registerTool(toolRegistry);
