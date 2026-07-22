@@ -1,20 +1,15 @@
-package org.example.nlp2dsl2sql.semanticdsl.agent;
+package org.example.nlp2dsl2sql.service.impl;
 
-import org.example.nlp2dsl2sql.semanticdsl.tools.MultiAgentSessionContext;
 import io.agentscope.core.agent.RuntimeContext;
-import io.agentscope.core.event.AgentEvent;
-import io.agentscope.core.event.TextBlockDeltaEvent;
-import io.agentscope.core.event.ToolCallStartEvent;
-import io.agentscope.core.event.ToolResultEndEvent;
-import io.agentscope.core.event.ToolResultTextDeltaEvent;
+import io.agentscope.core.event.*;
 import io.agentscope.core.message.UserMessage;
 import io.agentscope.harness.agent.HarnessAgent;
 import lombok.extern.slf4j.Slf4j;
+import org.example.nlp2dsl2sql.semanticdsl.tools.AgentSessionContext;
+import org.example.nlp2dsl2sql.service.INlp2dsl2sqlAgentService;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
-
-import java.util.UUID;
 
 /**
  * 多 Agent 协作服务实现 — HarnessAgent 内置 ReAct + {@code @Tool} Toolkit。
@@ -29,7 +24,7 @@ import java.util.UUID;
  */
 @Slf4j
 @Service
-public class MultiAgentServiceImpl implements IMultiAgentService {
+public class Nlp2dsl2sqlAgentServiceImpl implements INlp2dsl2sqlAgentService {
 
     private final HarnessAgent nlp2dsl2sqlAgentLatest;
 
@@ -38,7 +33,7 @@ public class MultiAgentServiceImpl implements IMultiAgentService {
      *
      * @param nlp2dsl2sqlAgentLatest
      */
-    public MultiAgentServiceImpl(
+    public Nlp2dsl2sqlAgentServiceImpl(
             @Qualifier("nlp2dsl2sqlAgentLatest") HarnessAgent nlp2dsl2sqlAgentLatest) {
         this.nlp2dsl2sqlAgentLatest = nlp2dsl2sqlAgentLatest;
     }
@@ -53,7 +48,7 @@ public class MultiAgentServiceImpl implements IMultiAgentService {
      * @return SSE 文本增量流
      */
     @Override
-    public Flux<String> multiAgentQuery(String question) {
+    public Flux<String> nlp2dsl2sqlAgentQuery(String question) {
         if (question == null || question.isBlank()) {
             return Flux.just("错误: 问题不能为空");
         }
@@ -61,11 +56,14 @@ public class MultiAgentServiceImpl implements IMultiAgentService {
         String trimmed = question.trim();
         // 每次查询使用独立 session，避免复用历史对话直接“背答案”跳过工具链。
         // 若需要多轮对话，应由前端传入稳定的 sessionId。
-        MultiAgentSessionContext session = new MultiAgentSessionContext();
+        AgentSessionContext session = new AgentSessionContext();
+
+        //同一 (userId, sessionId) 的请求自动串行化（不会并发写同一份状态）；
+        // 不同 session 完全并行
         RuntimeContext ctx = RuntimeContext.builder()
                 .userId("lsy")
                 .sessionId("0901")
-                .put(MultiAgentSessionContext.class, session)
+                .put(AgentSessionContext.class, session)
                 .build();
 
         log.info("━━━━━━━ HarnessAgent 流式 ReAct 启动 ━━━━━━━");
@@ -73,6 +71,7 @@ public class MultiAgentServiceImpl implements IMultiAgentService {
         return nlp2dsl2sqlAgentLatest
                 .streamEvents(new UserMessage(trimmed), ctx)
                 .mapNotNull(this::mapEventToSseChunk)
+                //這裡是打調試日誌。
                 .doOnNext(chunk -> {
                     if (log.isDebugEnabled()) {
                         log.debug("[SSE] chunk={}", abbreviate(chunk));
@@ -91,6 +90,18 @@ public class MultiAgentServiceImpl implements IMultiAgentService {
      *
      * @param event AgentScope 流式事件
      * @return SSE 文本；无关事件返回 null（由 mapNotNull 过滤）
+     */
+
+    /**
+     * mapEventToSseChunk 做事件類型分發：
+     * TextBlockDeltaEvent → 取 LLM token 增量文本
+     * ToolCallStartEvent → 生成 "========== [工具開始] xxx ==========" 標記
+     * ToolResultTextDeltaEvent → 取工具返回增量文本
+     * ToolResultEndEvent → 生成 "[工具結束] xxx (state)" 標記
+     * 其他 → null（過濾）
+     * 意義：把框架內部的、類型各異的 AgentEvent 統一降維成前端可直接顯示的純文本。
+     * @param event
+     * @return
      */
     private String mapEventToSseChunk(AgentEvent event) {
         if (event instanceof TextBlockDeltaEvent delta) {

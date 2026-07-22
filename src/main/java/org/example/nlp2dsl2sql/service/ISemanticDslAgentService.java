@@ -1,4 +1,4 @@
-package org.example.nlp2dsl2sql.semanticdsl.agent;
+package org.example.nlp2dsl2sql.service;
 
 import org.example.nlp2dsl2sql.semanticdsl.model.IntentResult;
 import reactor.core.publisher.Flux;

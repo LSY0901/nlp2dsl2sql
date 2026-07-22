@@ -1,16 +1,16 @@
 package org.example.nlp2dsl2sql.semanticdsl.tools;
 
+import com.alibaba.fastjson2.JSON;
+import io.agentscope.core.tool.Tool;
+import io.agentscope.core.tool.ToolParam;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.nlp2dsl2sql.models.entity.ReviewResult;
 import org.example.nlp2dsl2sql.semanticdsl.model.DslCandidate;
 import org.example.nlp2dsl2sql.semanticdsl.model.EnrichedQueryDSL;
 import org.example.nlp2dsl2sql.semanticdsl.model.IntentResult;
 import org.example.nlp2dsl2sql.semanticdsl.model.SemanticQueryDSL;
 import org.example.nlp2dsl2sql.tools.ReviewTool;
-import com.alibaba.fastjson2.JSON;
-import io.agentscope.core.tool.Tool;
-import io.agentscope.core.tool.ToolParam;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -22,13 +22,13 @@ import java.util.List;
  * 通过 {@link Tool} / {@link ToolParam} 注解注册到 AgentScope {@code Toolkit}，
  * 由 {@link io.agentscope.harness.agent.HarnessAgent} 在 ReAct 循环中自动调用。
  * <p>
- * 跨工具中间状态存放在 {@link MultiAgentSessionContext}，由
+ * 跨工具中间状态存放在 {@link AgentSessionContext}，由
  * {@link io.agentscope.core.agent.RuntimeContext} 按次注入。
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class MultiAgentToolRegistry {
+public class AgentToolRegistry {
 
     private final RetrievalTool retrievalTool;
     private final CandidateContextTool candidateContextTool;
@@ -46,12 +46,33 @@ public class MultiAgentToolRegistry {
      * @return 候选元数据文本
      */
     @Tool(name = "retrieve_metadata",
-            description = "语义检索：向量召回 + 同义词扩展 + Rerank，返回候选指标/维度/实体。"
-                    + "识别意图后优先调用此工具。")
+            description = """
+                    作用：
+                    根据用户自然语言问题检索业务语义元数据，为查询理解提供业务上下文。
+                    
+                    适用场景：
+                    - 用户提出数据查询或分析需求。
+                    - 需要识别指标、维度、实体、过滤条件等业务概念。
+                    - 需要将业务术语映射到系统中的语义模型。
+                    
+                    能力：
+                    - 向量语义检索。
+                    - 同义词扩展。
+                    - Rerank语义重排序。
+                    
+                    输入：
+                    用户原始问题。
+                    
+                    输出：
+                    返回候选指标、维度、实体、维度值及对应业务描述。
+                    
+                    限制：
+                    仅负责语义元数据检索，不生成DSL，不生成SQL，不执行数据库查询。
+                    """)
     public String retrieveMetadata(
-            @ToolParam(name = "question", description = "用户的自然语言问题")
+            @ToolParam(name = "question", description = "用户原始自然语言问题（用于向量检索）")
             String question,
-            MultiAgentSessionContext session) {
+            AgentSessionContext session) {
         log.info("━━━ [ReAct] 执行工具: retrieve_metadata ━━━");
         DslCandidate candidate = retrievalTool.retrieve(question);
         String contextText = candidateContextTool.buildCandidateContext(candidate);
@@ -71,7 +92,30 @@ public class MultiAgentToolRegistry {
      * @return 校验结果文本
      */
     @Tool(name = "validate_dsl",
-            description = "校验DSL的合法性与兼容性。传入DSL JSON和意图类型。")
+            description = """
+                    作用：
+                    验证语义DSL是否符合系统定义和业务查询规则。
+                    
+                    适用场景：
+                    - 已生成SemanticQueryDSL，需要判断是否有效。
+                    - 需要检查指标、维度、过滤条件之间的业务兼容性。
+                    
+                    校验内容：
+                    - DSL结构是否合法。
+                    - 指标是否存在。
+                    - 维度是否有效。
+                    - 指标与维度组合是否支持。
+                    - 过滤条件是否符合规则。
+                    
+                    输入：
+                    语义DSL JSON以及查询意图类型。
+                    
+                    输出：
+                    返回DSL校验结果以及错误原因。
+                    
+                    限制：
+                    只负责DSL验证，不自动修改DSL，不生成SQL。
+                    """)
     public String validateDsl(
             @ToolParam(name = "dsl",
                     description = "语义DSL的JSON字符串，格式: {metric,entity,dimensions,filters}")
@@ -79,7 +123,7 @@ public class MultiAgentToolRegistry {
             @ToolParam(name = "intent",
                     description = "意图类型: METRIC_QUERY / DIMENSION_ANALYSIS / DETAIL_QUERY")
             String intent,
-            MultiAgentSessionContext session) {
+            AgentSessionContext session) {
         log.info("━━━ [ReAct] 执行工具: validate_dsl ━━━");
         try {
             SemanticQueryDSL semanticDsl = JSON.parseObject(dsl, SemanticQueryDSL.class);
@@ -107,13 +151,34 @@ public class MultiAgentToolRegistry {
      * @return 富化结果 JSON
      */
     @Tool(name = "enrich_dsl",
-            description = "DSL富化：将语义code转为物理表/列，BFS求解JOIN路径。校验通过后调用。")
+            description = """
+                    作用：
+                    将业务语义DSL转换为包含数据库执行信息的富化DSL。
+                    
+                    适用场景：
+                    - 需要将业务概念映射到数据库结构。
+                    - 需要补充查询执行所需的表、字段和关联关系。
+                    
+                    处理能力：
+                    - 业务编码映射物理表和字段。
+                    - 根据关系模型计算JOIN路径。
+                    - 补充系统过滤条件。
+                    
+                    输入：
+                    语义DSL JSON。
+                    
+                    输出：
+                    返回富化后的查询DSL，包括表、字段、JOIN关系和查询约束。
+                    
+                    限制：
+                    只负责DSL语义到数据库模型转换，不生成SQL，不执行查询。
+                    """)
     public String enrichDsl(
-            @ToolParam(name = "dsl", description = "语义DSL的JSON字符串")
+            @ToolParam(name = "dsl", description = "语义DSL的JSON字符串（应与validate_dsl校验通过的DSL一致）")
             String dsl,
             @ToolParam(name = "question", description = "用户原始问题（用于补充检索候选集）")
             String question,
-            MultiAgentSessionContext session) {
+            AgentSessionContext session) {
         log.info("━━━ [ReAct] 执行工具: enrich_dsl ━━━");
         try {
             DslCandidate candidate = session.getCandidate();
@@ -143,12 +208,34 @@ public class MultiAgentToolRegistry {
      * @return SQL 与参数
      */
     @Tool(name = "translate_sql",
-            description = "将富化后的DSL翻译为参数化SQL。")
+            description = """
+                    作用：
+                    将富化后的DSL转换为数据库可执行的参数化SQL。
+                    
+                    适用场景：
+                    - 需要将结构化查询模型转换为SQL语句。
+                    
+                    处理能力：
+                    - DSL语义解析。
+                    - 表字段转换。
+                    - SQL生成。
+                    - 查询参数绑定。
+                    
+                    输入：
+                    富化后的EnrichedQueryDSL。
+                    
+                    输出：
+                    返回SQL语句以及对应参数列表。
+                    
+                    限制：
+                    只负责SQL生成，不执行SQL，不负责业务语义分析。
+                    生成SQL必须使用参数绑定方式。
+                    """)
     public String translateSql(
             @ToolParam(name = "enriched_dsl",
                     description = "富化后DSL的JSON字符串（来自 enrich_dsl 的结果）")
             String enrichedDsl,
-            MultiAgentSessionContext session) {
+            AgentSessionContext session) {
         log.info("━━━ [ReAct] 执行工具: translate_sql ━━━");
         try {
             EnrichedQueryDSL enriched =
@@ -174,12 +261,35 @@ public class MultiAgentToolRegistry {
      * @return 审查结果文本
      */
     @Tool(name = "review_sql",
-            description = "LLM审查SQL正确性。翻译后调用。")
+            description = """
+                    作用：
+                    检查SQL语句是否符合业务语义和数据库查询规范。
+                    
+                    适用场景：
+                    - 需要判断SQL是否正确表达业务查询意图。
+                    - 需要发现SQL生成过程中的潜在错误。
+                    
+                    检查内容：
+                    - 查询字段是否正确。
+                    - 指标计算逻辑是否合理。
+                    - 聚合方式是否正确。
+                    - JOIN关系是否符合业务模型。
+                    - SQL是否存在明显风险。
+                    
+                    输入：
+                    待检查SQL以及对应业务查询上下文。
+                    
+                    输出：
+                    返回SQL审查结果以及问题说明。
+                    
+                    限制：
+                    只负责SQL分析，不执行SQL，不自动修改SQL。
+                    """)
     public String reviewSql(
-            @ToolParam(name = "sql", description = "待审查的SQL语句")
+            @ToolParam(name = "sql", description = "待审查的SQL语句（来自translate_sql的返回结果）")
             String sql,
             @ToolParam(name = "enriched_dsl",
-                    description = "富化后DSL的JSON字符串（用于构建schema上下文）")
+                    description = "富化后DSL的JSON字符串（来自enrich_dsl的返回结果，用于构建schema上下文）")
             String enrichedDsl) {
         log.info("━━━ [ReAct] 执行工具: review_sql ━━━");
         try {
@@ -207,13 +317,36 @@ public class MultiAgentToolRegistry {
      * @return 查询结果文本
      */
     @Tool(name = "execute_sql",
-            description = "安全执行SQL（仅SELECT）。审查通过后调用。返回查询结果。")
+            description = """
+                    作用：
+                    执行查询SQL并返回数据库查询结果。
+                    
+                    适用场景：
+                    - 需要获取数据库中的业务数据结果。
+                    
+                    安全能力：
+                    - SQL安全检查。
+                    - 参数化查询。
+                    - 限制危险数据库操作。
+                    
+                    输入：
+                    SQL语句以及查询参数。
+                    
+                    输出：
+                    返回查询结果数据。
+                    
+                    限制：
+                    仅支持查询操作。
+                    不负责SQL生成。
+                    不负责SQL审查。
+                    禁止执行数据修改类SQL。
+                    """)
     public String executeSql(
-            @ToolParam(name = "sql", description = "要执行的SQL语句")
+            @ToolParam(name = "sql", description = "要执行的SQL语句（来自translate_sql的返回结果）")
             String sql,
-            @ToolParam(name = "params", description = "SQL参数列表")
+            @ToolParam(name = "params", description = "SQL参数列表（可为null，为null时自动从上下文获取）")
             List<Object> params,
-            MultiAgentSessionContext session) {
+            AgentSessionContext session) {
         log.info("━━━ [ReAct] 执行工具: execute_sql ━━━");
         List<Object> boundParams = new ArrayList<>();
         if (params != null) {

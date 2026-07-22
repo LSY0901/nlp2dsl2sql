@@ -15,7 +15,7 @@ import java.util.Map;
  * 工具方法参数可直接接收本类型（框架自动注入，无需 {@code @ToolParam}）。
  */
 @Data
-public class MultiAgentSessionContext {
+public class AgentSessionContext {
 
     /** 检索候选集 */
     private DslCandidate candidate;

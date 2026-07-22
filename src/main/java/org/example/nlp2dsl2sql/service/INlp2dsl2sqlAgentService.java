@@ -1,4 +1,4 @@
-package org.example.nlp2dsl2sql.semanticdsl.agent;
+package org.example.nlp2dsl2sql.service;
 
 import reactor.core.publisher.Flux;
 
@@ -22,10 +22,8 @@ import reactor.core.publisher.Flux;
  *   └─ [LLM]  Supervisor 回答    → 自然语言结论
  * </pre>
  *
- * @see org.example.nlp2dsl2sql.semanticdsl.agent.MultiAgentServiceImpl
- * @see org.example.nlp2dsl2sql.agent.MultiAgentConfig
  */
-public interface IMultiAgentService {
+public interface INlp2dsl2sqlAgentService {
 
     /**
      * 多 Agent 协作查询（SSE 流式输出）。
@@ -33,5 +31,5 @@ public interface IMultiAgentService {
      * @param question 用户自然语言问题
      * @return SSE 流式响应
      */
-    Flux<String> multiAgentQuery(String question);
+    Flux<String> nlp2dsl2sqlAgentQuery(String question);
 }

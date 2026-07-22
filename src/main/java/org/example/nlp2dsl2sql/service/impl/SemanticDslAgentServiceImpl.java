@@ -1,4 +1,4 @@
-package org.example.nlp2dsl2sql.semanticdsl.agent;
+package org.example.nlp2dsl2sql.service.impl;
 
 import org.example.nlp2dsl2sql.models.entity.ReviewResult;
 import org.example.nlp2dsl2sql.semanticdsl.enricher.SemanticDslEnricher;
@@ -10,6 +10,7 @@ import org.example.nlp2dsl2sql.semanticdsl.prompt.SemanticPromptTemplates;
 import org.example.nlp2dsl2sql.semanticdsl.retriever.DslRetriever;
 import org.example.nlp2dsl2sql.semanticdsl.translator.DslTranslator;
 import org.example.nlp2dsl2sql.semanticdsl.validator.SemanticDslValidator;
+import org.example.nlp2dsl2sql.service.ISemanticDslAgentService;
 import org.example.nlp2dsl2sql.tools.ReviewTool;
 import org.example.nlp2dsl2sql.tools.SqlExecuteTool;
 import com.alibaba.fastjson2.JSON;
