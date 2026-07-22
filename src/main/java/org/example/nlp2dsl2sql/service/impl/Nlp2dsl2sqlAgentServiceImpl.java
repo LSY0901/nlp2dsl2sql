@@ -1,20 +1,15 @@
-package org.example.nlp2dsl2sql.semanticdsl.agent;
+package org.example.nlp2dsl2sql.service.impl;
 
-import org.example.nlp2dsl2sql.semanticdsl.tools.MultiAgentSessionContext;
 import io.agentscope.core.agent.RuntimeContext;
-import io.agentscope.core.event.AgentEvent;
-import io.agentscope.core.event.TextBlockDeltaEvent;
-import io.agentscope.core.event.ToolCallStartEvent;
-import io.agentscope.core.event.ToolResultEndEvent;
-import io.agentscope.core.event.ToolResultTextDeltaEvent;
+import io.agentscope.core.event.*;
 import io.agentscope.core.message.UserMessage;
 import io.agentscope.harness.agent.HarnessAgent;
 import lombok.extern.slf4j.Slf4j;
+import org.example.nlp2dsl2sql.semanticdsl.tools.MultiAgentSessionContext;
+import org.example.nlp2dsl2sql.service.INlp2dsl2sqlAgentService;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
-
-import java.util.UUID;
 
 /**
  * 多 Agent 协作服务实现 — HarnessAgent 内置 ReAct + {@code @Tool} Toolkit。
@@ -29,7 +24,7 @@ import java.util.UUID;
  */
 @Slf4j
 @Service
-public class MultiAgentServiceImpl implements IMultiAgentService {
+public class Nlp2dsl2sqlAgentServiceImpl implements INlp2dsl2sqlAgentService {
 
     private final HarnessAgent nlp2dsl2sqlAgentLatest;
 
@@ -38,7 +33,7 @@ public class MultiAgentServiceImpl implements IMultiAgentService {
      *
      * @param nlp2dsl2sqlAgentLatest
      */
-    public MultiAgentServiceImpl(
+    public Nlp2dsl2sqlAgentServiceImpl(
             @Qualifier("nlp2dsl2sqlAgentLatest") HarnessAgent nlp2dsl2sqlAgentLatest) {
         this.nlp2dsl2sqlAgentLatest = nlp2dsl2sqlAgentLatest;
     }
@@ -53,7 +48,7 @@ public class MultiAgentServiceImpl implements IMultiAgentService {
      * @return SSE 文本增量流
      */
     @Override
-    public Flux<String> multiAgentQuery(String question) {
+    public Flux<String> nlp2dsl2sqlAgentQuery(String question) {
         if (question == null || question.isBlank()) {
             return Flux.just("错误: 问题不能为空");
         }

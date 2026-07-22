@@ -11,18 +11,18 @@ import org.springframework.context.annotation.Configuration;
 import java.nio.file.Paths;
 
 /**
- * 多 Agent 配置 — 基于 AgentScope Harness 的 Supervisor + Toolkit 架构。
+ * 多 Agent 配置 — 基于 AgentScope Harness 的 nlp2dsl2sqlAgentLatest + Toolkit 架构。
  * <p>
- * Supervisor 通过框架内置 ReAct 循环调用 {@link MultiAgentToolRegistry} 中
+ * nlp2dsl2sqlAgentLatest 通过框架内置 ReAct 循环调用 {@link MultiAgentToolRegistry} 中
  * 以 {@code @Tool} 注解注册的业务工具。
  */
 @Configuration
-public class MultiAgentConfig {
+public class AgentConfig {
 
     /**
-     * Supervisor Agent 的系统提示词。
+     * nlp2dsl2sqlAgentLatest Agent 的系统提示词。
      * <p>
-     * Supervisor 通过 ReAct 循环自主调用工具完成 NLP→DSL→SQL 全流程。
+     * nlp2dsl2sqlAgentLatest 通过 ReAct 循环自主调用工具完成 NLP→DSL→SQL 全流程。
      * LLM 决定调用顺序，而非 Java 代码硬编码。
      */
     public static final String SUPERVISOR_PROMPT = """
@@ -79,17 +79,17 @@ public class MultiAgentConfig {
     public static final String REVIEW_AGENT_PROMPT = "你是SQL审查专家。";
     public static final String ANSWER_AGENT_PROMPT = "你是数据分析专家。";
 
-    // ==================== Supervisor Agent Bean ====================
+    // ==================== nlp2dsl2sqlAgentLatest Agent Bean ====================
 
     /**
-     * Supervisor Agent — 多 Agent 系统的核心编排者。
+     * nlp2dsl2sqlAgentLatest Agent — 多 Agent 系统的核心编排者。
      * <p>
      * 将 {@link MultiAgentToolRegistry} 注册到 Toolkit，由 HarnessAgent
      * 内置 ReAct 循环自动完成 tool_call → 执行 → observation。
      *
      * @param model        LLM 模型
      * @param toolRegistry 带 {@code @Tool} 注解的业务工具 Bean
-     * @return Supervisor HarnessAgent
+     * @return nlp2dsl2sqlAgentLatest HarnessAgent
      */
     @Bean
     public HarnessAgent nlp2dsl2sqlAgentLatest(OpenAIChatModel model,

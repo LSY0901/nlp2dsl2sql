@@ -256,7 +256,7 @@
     NLP2DSL2SQL 数据分析助手
     <div class="mode-switch">
         <button class="mode-btn active" id="modeWorkflow" onclick="switchMode('workflow')">V2 Workflow</button>
-        <button class="mode-btn" id="modeMultiAgent" onclick="switchMode('multiAgent')">多 Agent</button>
+        <button class="mode-btn" id="modeAgent" onclick="switchMode('multiAgent')">agent-tools-ReAct</button>
     </div>
 </header>
 
@@ -288,13 +288,13 @@
     function switchMode(mode) {
         currentMode = mode;
         document.getElementById('modeWorkflow').classList.toggle('active', mode === 'workflow');
-        document.getElementById('modeMultiAgent').classList.toggle('active', mode === 'multiAgent');
+        document.getElementById('modeAgent').classList.toggle('active', mode === 'multiAgent');
         userInput.focus();
     }
 
     function getApiEndpoint() {
         if (currentMode === 'multiAgent') {
-            return `${API_BASE_URL}/aiChat/nlp2Dsl2SqlMultiAgent`;
+            return `${API_BASE_URL}/aiChat/nlp2Dsl2SqlAgent`;
         }
         return `${API_BASE_URL}/aiChat/nlp2Dsl2SqlAgentV2`;
     }

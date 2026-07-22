@@ -1,7 +1,7 @@
 package org.example.nlp2dsl2sql.controller;
 
 import org.example.nlp2dsl2sql.models.request.Nlp2DslAgentRequest;
-import org.example.nlp2dsl2sql.semanticdsl.agent.IMultiAgentService;
+import org.example.nlp2dsl2sql.service.INlp2dsl2sqlAgentService;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -14,23 +14,21 @@ import reactor.core.publisher.Flux;
  * 提供 SSE 流式接口，通过 Supervisor {@code HarnessAgent} + {@code @Tool} Toolkit
  * 完成自然语言到 SQL 的查询。
  * <p>
- * 与 {@link Nlp2Dsl2SqlAgentController}（V2 Workflow）共存，方便对比效果。
+ * 与 {@link Nlp2Dsl2SqlAgentWorkFlowController}（V2 Workflow）共存，方便对比效果。
  *
- * @see org.example.nlp2dsl2sql.semanticdsl.agent.IMultiAgentService
- * @see org.example.nlp2dsl2sql.agent.MultiAgentConfig
  */
 @RestController
 @RequestMapping("/aiChat")
-public class MultiAgentController {
+public class Nlp2Dsl2SqlAgentToolReActController {
 
-    private final IMultiAgentService multiAgentService;
+    private final INlp2dsl2sqlAgentService multiAgentService;
 
     /**
      * 构造 Controller。
      *
      * @param multiAgentService 多 Agent 服务
      */
-    public MultiAgentController(IMultiAgentService multiAgentService) {
+    public Nlp2Dsl2SqlAgentToolReActController(INlp2dsl2sqlAgentService multiAgentService) {
         this.multiAgentService = multiAgentService;
     }
 
@@ -49,8 +47,8 @@ public class MultiAgentController {
      * @param request
      * @return
      */
-    @GetMapping(value = "/nlp2Dsl2SqlMultiAgent", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @GetMapping(value = "/nlp2Dsl2SqlAgent", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> multiAgentChat(Nlp2DslAgentRequest request) {
-        return multiAgentService.multiAgentQuery(request.getQuestion());
+        return multiAgentService.nlp2dsl2sqlAgentQuery(request.getQuestion());
     }
 }
