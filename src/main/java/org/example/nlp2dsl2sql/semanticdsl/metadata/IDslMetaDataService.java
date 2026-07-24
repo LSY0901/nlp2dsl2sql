@@ -1,6 +1,6 @@
 package org.example.nlp2dsl2sql.semanticdsl.metadata;
 
-import org.example.nlp2dsl2sql.semanticdsl.metadata.entity.*;
+import org.example.nlp2dsl2sql.models.entity.dsl.*;
 
 import java.util.List;
 

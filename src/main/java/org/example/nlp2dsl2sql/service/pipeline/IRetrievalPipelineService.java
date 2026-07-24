@@ -1,6 +1,6 @@
 package org.example.nlp2dsl2sql.service.pipeline;
 
-import org.example.nlp2dsl2sql.semanticdsl.model.DslCandidate;
+import org.example.nlp2dsl2sql.models.dto.dsl.DslCandidate;
 
 /**
  * 语义检索 Pipeline Service。

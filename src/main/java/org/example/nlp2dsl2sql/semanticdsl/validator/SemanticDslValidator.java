@@ -1,13 +1,13 @@
 package org.example.nlp2dsl2sql.semanticdsl.validator;
 
 import org.example.nlp2dsl2sql.semanticdsl.metadata.IDslMetaDataService;
-import org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslDimension;
-import org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslDimensionValue;
-import org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslMetric;
-import org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslMetricDimension;
-import org.example.nlp2dsl2sql.semanticdsl.model.IntentResult;
-import org.example.nlp2dsl2sql.semanticdsl.model.SemanticFilter;
-import org.example.nlp2dsl2sql.semanticdsl.model.SemanticQueryDSL;
+import org.example.nlp2dsl2sql.models.entity.dsl.DslDimension;
+import org.example.nlp2dsl2sql.models.entity.dsl.DslDimensionValue;
+import org.example.nlp2dsl2sql.models.entity.dsl.DslMetric;
+import org.example.nlp2dsl2sql.models.entity.dsl.DslMetricDimension;
+import org.example.nlp2dsl2sql.models.dto.dsl.IntentResult;
+import org.example.nlp2dsl2sql.models.dto.dsl.SemanticFilter;
+import org.example.nlp2dsl2sql.models.dto.dsl.SemanticQueryDSL;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

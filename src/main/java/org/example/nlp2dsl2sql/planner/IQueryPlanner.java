@@ -1,7 +1,7 @@
 package org.example.nlp2dsl2sql.planner;
 
-import org.example.nlp2dsl2sql.planner.model.QueryPlan;
-import org.example.nlp2dsl2sql.planner.model.StepType;
+import org.example.nlp2dsl2sql.models.entity.planner.QueryPlan;
+import org.example.nlp2dsl2sql.enums.planner.StepType;
 
 /**
  * 查询规划器：由 LLM 产出/修正结构化执行计划。

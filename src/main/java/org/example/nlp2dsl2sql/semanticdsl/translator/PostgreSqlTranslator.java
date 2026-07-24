@@ -1,5 +1,7 @@
 package org.example.nlp2dsl2sql.semanticdsl.translator;
 
+import org.example.nlp2dsl2sql.enums.SqlDialect;
+
 public class PostgreSqlTranslator extends AbstractDslTranslator {
 
     @Override

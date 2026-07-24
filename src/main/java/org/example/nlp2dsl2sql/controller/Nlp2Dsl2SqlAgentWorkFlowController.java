@@ -1,6 +1,6 @@
 package org.example.nlp2dsl2sql.controller;
 
-import org.example.nlp2dsl2sql.models.request.Nlp2DslAgentRequest;
+import org.example.nlp2dsl2sql.models.vo.Nlp2DslAgentRequest;
 import org.example.nlp2dsl2sql.service.ISemanticDslAgentService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;

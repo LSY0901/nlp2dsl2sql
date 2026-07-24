@@ -1,6 +1,6 @@
 package org.example.nlp2dsl2sql.service.pipeline;
 
-import org.example.nlp2dsl2sql.semanticdsl.model.EnrichedQueryDSL;
+import org.example.nlp2dsl2sql.models.dto.dsl.EnrichedQueryDSL;
 import org.example.nlp2dsl2sql.semanticdsl.translator.DslTranslator;
 
 /**

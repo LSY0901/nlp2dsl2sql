@@ -5,7 +5,7 @@ import io.agentscope.core.event.*;
 import io.agentscope.core.message.UserMessage;
 import io.agentscope.harness.agent.HarnessAgent;
 import lombok.extern.slf4j.Slf4j;
-import org.example.nlp2dsl2sql.semanticdsl.tools.AgentSessionContext;
+import org.example.nlp2dsl2sql.models.dto.dsl.AgentSessionContext;
 import org.example.nlp2dsl2sql.service.INlp2dsl2sqlAgentService;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;

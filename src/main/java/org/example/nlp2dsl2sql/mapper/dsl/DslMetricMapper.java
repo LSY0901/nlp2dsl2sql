@@ -2,7 +2,7 @@ package org.example.nlp2dsl2sql.mapper.dsl;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-import org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslMetric;
+import org.example.nlp2dsl2sql.models.entity.dsl.DslMetric;
 
 import java.util.List;
 

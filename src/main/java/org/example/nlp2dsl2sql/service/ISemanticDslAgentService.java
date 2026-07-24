@@ -1,6 +1,6 @@
 package org.example.nlp2dsl2sql.service;
 
-import org.example.nlp2dsl2sql.semanticdsl.model.IntentResult;
+import org.example.nlp2dsl2sql.models.dto.dsl.IntentResult;
 import reactor.core.publisher.Flux;
 
 public interface ISemanticDslAgentService {

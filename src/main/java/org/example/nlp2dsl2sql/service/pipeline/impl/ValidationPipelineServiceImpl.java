@@ -2,8 +2,8 @@ package org.example.nlp2dsl2sql.service.pipeline.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.example.nlp2dsl2sql.semanticdsl.model.IntentResult;
-import org.example.nlp2dsl2sql.semanticdsl.model.SemanticQueryDSL;
+import org.example.nlp2dsl2sql.models.dto.dsl.IntentResult;
+import org.example.nlp2dsl2sql.models.dto.dsl.SemanticQueryDSL;
 import org.example.nlp2dsl2sql.semanticdsl.validator.SemanticDslValidator;
 import org.example.nlp2dsl2sql.service.pipeline.IValidationPipelineService;
 import org.springframework.stereotype.Service;

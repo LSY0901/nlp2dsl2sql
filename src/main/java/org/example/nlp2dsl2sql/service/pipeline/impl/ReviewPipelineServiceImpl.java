@@ -3,7 +3,7 @@ package org.example.nlp2dsl2sql.service.pipeline.impl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.nlp2dsl2sql.models.entity.ReviewResult;
-import org.example.nlp2dsl2sql.semanticdsl.model.EnrichedQueryDSL;
+import org.example.nlp2dsl2sql.models.dto.dsl.EnrichedQueryDSL;
 import org.example.nlp2dsl2sql.service.pipeline.IReviewPipelineService;
 import org.example.nlp2dsl2sql.service.pipeline.ITranslationPipelineService;
 import org.example.nlp2dsl2sql.tools.ReviewTool;

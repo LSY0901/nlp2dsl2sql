@@ -9,14 +9,14 @@ import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.example.nlp2dsl2sql.planner.model.PlanGoal;
-import org.example.nlp2dsl2sql.semanticdsl.model.DslCandidate;
-import org.example.nlp2dsl2sql.semanticdsl.model.IntentResult;
-import org.example.nlp2dsl2sql.semanticdsl.model.SemanticQueryDSL;
-import org.example.nlp2dsl2sql.semanticdsl.prompt.SemanticPromptTemplates;
-import org.example.nlp2dsl2sql.semanticdsl.tools.CandidateContextTool;
+import org.example.nlp2dsl2sql.models.entity.planner.PlanGoal;
+import org.example.nlp2dsl2sql.models.dto.dsl.DslCandidate;
+import org.example.nlp2dsl2sql.models.dto.dsl.IntentResult;
+import org.example.nlp2dsl2sql.models.dto.dsl.SemanticQueryDSL;
+import org.example.nlp2dsl2sql.prompt.SemanticPromptTemplates;
+import org.example.nlp2dsl2sql.tools.CandidateContextTool;
 import org.example.nlp2dsl2sql.service.pipeline.IDslGeneratePipelineService;
-import org.example.nlp2dsl2sql.workflow.WorkflowException;
+import org.example.nlp2dsl2sql.exception.Nlp2dsl2sqlException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -69,7 +69,7 @@ public class DslGeneratePipelineServiceImpl implements IDslGeneratePipelineServi
             return dsl;
         } catch (Exception e) {
             log.error("DSL解析失败: {}, raw={}", e.getMessage(), response);
-            throw new WorkflowException("DSL解析失败，请重试", e);
+            throw new Nlp2dsl2sqlException("DSL解析失败，请重试", e);
         }
     }
 

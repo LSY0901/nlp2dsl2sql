@@ -3,9 +3,9 @@ package org.example.nlp2dsl2sql.service.pipeline.impl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.nlp2dsl2sql.semanticdsl.enricher.SemanticDslEnricher;
-import org.example.nlp2dsl2sql.semanticdsl.model.DslCandidate;
-import org.example.nlp2dsl2sql.semanticdsl.model.EnrichedQueryDSL;
-import org.example.nlp2dsl2sql.semanticdsl.model.SemanticQueryDSL;
+import org.example.nlp2dsl2sql.models.dto.dsl.DslCandidate;
+import org.example.nlp2dsl2sql.models.dto.dsl.EnrichedQueryDSL;
+import org.example.nlp2dsl2sql.models.dto.dsl.SemanticQueryDSL;
 import org.example.nlp2dsl2sql.service.pipeline.IEnrichmentPipelineService;
 import org.springframework.stereotype.Service;
 

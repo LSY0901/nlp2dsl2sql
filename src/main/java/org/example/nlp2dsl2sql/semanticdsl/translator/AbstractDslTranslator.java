@@ -1,9 +1,9 @@
 package org.example.nlp2dsl2sql.semanticdsl.translator;
 
-import org.example.nlp2dsl2sql.semanticdsl.model.EnrichedQueryDSL;
-import org.example.nlp2dsl2sql.semanticdsl.model.EnrichedQueryDSL.EnrichedJoin;
-import org.example.nlp2dsl2sql.semanticdsl.model.EnrichedQueryDSL.SelectColumn;
-import org.example.nlp2dsl2sql.semanticdsl.model.EnrichedQueryDSL.WhereColumn;
+import org.example.nlp2dsl2sql.models.dto.dsl.EnrichedQueryDSL;
+import org.example.nlp2dsl2sql.models.dto.dsl.EnrichedQueryDSL.EnrichedJoin;
+import org.example.nlp2dsl2sql.models.dto.dsl.EnrichedQueryDSL.SelectColumn;
+import org.example.nlp2dsl2sql.models.dto.dsl.EnrichedQueryDSL.WhereColumn;
 
 import java.util.ArrayList;
 import java.util.List;

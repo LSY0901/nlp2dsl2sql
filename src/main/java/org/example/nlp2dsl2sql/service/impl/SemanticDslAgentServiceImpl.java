@@ -2,12 +2,12 @@ package org.example.nlp2dsl2sql.service.impl;
 
 import org.example.nlp2dsl2sql.models.entity.ReviewResult;
 import org.example.nlp2dsl2sql.semanticdsl.enricher.SemanticDslEnricher;
-import org.example.nlp2dsl2sql.semanticdsl.model.DslCandidate;
-import org.example.nlp2dsl2sql.semanticdsl.model.EnrichedQueryDSL;
-import org.example.nlp2dsl2sql.semanticdsl.model.IntentResult;
-import org.example.nlp2dsl2sql.semanticdsl.model.SemanticQueryDSL;
-import org.example.nlp2dsl2sql.semanticdsl.prompt.SemanticPromptTemplates;
-import org.example.nlp2dsl2sql.semanticdsl.retriever.DslRetriever;
+import org.example.nlp2dsl2sql.models.dto.dsl.DslCandidate;
+import org.example.nlp2dsl2sql.models.dto.dsl.EnrichedQueryDSL;
+import org.example.nlp2dsl2sql.models.dto.dsl.IntentResult;
+import org.example.nlp2dsl2sql.models.dto.dsl.SemanticQueryDSL;
+import org.example.nlp2dsl2sql.prompt.SemanticPromptTemplates;
+import org.example.nlp2dsl2sql.tools.DslRetriever;
 import org.example.nlp2dsl2sql.semanticdsl.translator.DslTranslator;
 import org.example.nlp2dsl2sql.semanticdsl.validator.SemanticDslValidator;
 import org.example.nlp2dsl2sql.service.ISemanticDslAgentService;

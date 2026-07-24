@@ -1,7 +1,7 @@
 package org.example.nlp2dsl2sql.service.pipeline;
 
 import org.example.nlp2dsl2sql.models.entity.ReviewResult;
-import org.example.nlp2dsl2sql.semanticdsl.model.EnrichedQueryDSL;
+import org.example.nlp2dsl2sql.models.dto.dsl.EnrichedQueryDSL;
 
 /**
  * SQL 审查 Pipeline Service。

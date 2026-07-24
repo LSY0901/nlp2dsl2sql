@@ -1,7 +1,7 @@
 package org.example.nlp2dsl2sql.service.pipeline;
 
-import org.example.nlp2dsl2sql.semanticdsl.model.IntentResult;
-import org.example.nlp2dsl2sql.semanticdsl.model.SemanticQueryDSL;
+import org.example.nlp2dsl2sql.models.dto.dsl.IntentResult;
+import org.example.nlp2dsl2sql.models.dto.dsl.SemanticQueryDSL;
 import org.example.nlp2dsl2sql.semanticdsl.validator.SemanticDslValidator;
 
 /**

@@ -1,9 +1,9 @@
 package org.example.nlp2dsl2sql.service.pipeline;
 
-import org.example.nlp2dsl2sql.planner.model.PlanGoal;
-import org.example.nlp2dsl2sql.semanticdsl.model.DslCandidate;
-import org.example.nlp2dsl2sql.semanticdsl.model.IntentResult;
-import org.example.nlp2dsl2sql.semanticdsl.model.SemanticQueryDSL;
+import org.example.nlp2dsl2sql.models.entity.planner.PlanGoal;
+import org.example.nlp2dsl2sql.models.dto.dsl.DslCandidate;
+import org.example.nlp2dsl2sql.models.dto.dsl.IntentResult;
+import org.example.nlp2dsl2sql.models.dto.dsl.SemanticQueryDSL;
 
 /**
  * 语义 DSL 生成 Pipeline Service（独立 LLM 调用）。

@@ -1,8 +1,8 @@
 package org.example.nlp2dsl2sql.semanticdsl.metadata;
 
-import org.example.nlp2dsl2sql.mapper.dsl.*;
-import org.example.nlp2dsl2sql.semanticdsl.metadata.entity.*;
 import lombok.RequiredArgsConstructor;
+import org.example.nlp2dsl2sql.mapper.dsl.*;
+import org.example.nlp2dsl2sql.models.entity.dsl.*;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;

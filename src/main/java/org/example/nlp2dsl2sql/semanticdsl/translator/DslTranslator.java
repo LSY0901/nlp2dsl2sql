@@ -1,6 +1,7 @@
 package org.example.nlp2dsl2sql.semanticdsl.translator;
 
-import org.example.nlp2dsl2sql.semanticdsl.model.EnrichedQueryDSL;
+import org.example.nlp2dsl2sql.enums.SqlDialect;
+import org.example.nlp2dsl2sql.models.dto.dsl.EnrichedQueryDSL;
 
 import java.util.Collections;
 import java.util.List;

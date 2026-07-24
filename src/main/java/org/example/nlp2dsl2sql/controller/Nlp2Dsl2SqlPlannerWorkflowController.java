@@ -1,7 +1,7 @@
 package org.example.nlp2dsl2sql.controller;
 
-import org.example.nlp2dsl2sql.models.request.Nlp2DslAgentRequest;
-import org.example.nlp2dsl2sql.workflow.IQueryWorkflowEngine;
+import org.example.nlp2dsl2sql.models.vo.Nlp2DslAgentRequest;
+import org.example.nlp2dsl2sql.service.IQueryWorkflowEngine;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

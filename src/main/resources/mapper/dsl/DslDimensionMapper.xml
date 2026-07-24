@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.example.nlp2dsl2sql.mapper.dsl.DslDimensionMapper">
-    <select id="selectAll" resultType="org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslDimension">
+    <select id="selectAll" resultType="org.example.nlp2dsl2sql.models.entity.dsl.DslDimension">
         SELECT id,
                dimension_code,
                dimension_name,
@@ -19,7 +19,7 @@
         FROM agent.dsl_dimension
         WHERE is_deleted = false
     </select>
-    <select id="selectByDimensionCode" resultType="org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslDimension">
+    <select id="selectByDimensionCode" resultType="org.example.nlp2dsl2sql.models.entity.dsl.DslDimension">
         SELECT id,
                dimension_code,
                dimension_name,
@@ -38,7 +38,7 @@
         WHERE dimension_code = #{dimensionCode}
           AND is_deleted = false
     </select>
-    <select id="selectByDimensionCodes" resultType="org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslDimension">
+    <select id="selectByDimensionCodes" resultType="org.example.nlp2dsl2sql.models.entity.dsl.DslDimension">
         SELECT id, dimension_code, dimension_name, entity_code, attribute_code, dimension_type,
         physical_column, description, is_queryable, is_deleted, creator, created_dt, last_editor, last_edited_dt
         FROM agent.dsl_dimension WHERE is_deleted = false AND dimension_code IN
@@ -54,7 +54,7 @@
         ORDER BY embedding &lt;=&gt; #{vector}::vector
             LIMIT #{limit}
     </select>
-    <select id="selectWithNullEmbedding" resultType="org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslDimension">
+    <select id="selectWithNullEmbedding" resultType="org.example.nlp2dsl2sql.models.entity.dsl.DslDimension">
         SELECT id, dimension_code, dimension_name, description
         FROM agent.dsl_dimension
         WHERE is_deleted = false

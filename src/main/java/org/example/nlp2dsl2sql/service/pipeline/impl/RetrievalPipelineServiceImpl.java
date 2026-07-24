@@ -2,8 +2,8 @@ package org.example.nlp2dsl2sql.service.pipeline.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.example.nlp2dsl2sql.semanticdsl.model.DslCandidate;
-import org.example.nlp2dsl2sql.semanticdsl.retriever.DslRetriever;
+import org.example.nlp2dsl2sql.models.dto.dsl.DslCandidate;
+import org.example.nlp2dsl2sql.tools.DslRetriever;
 import org.example.nlp2dsl2sql.service.pipeline.IRetrievalPipelineService;
 import org.springframework.stereotype.Service;
 

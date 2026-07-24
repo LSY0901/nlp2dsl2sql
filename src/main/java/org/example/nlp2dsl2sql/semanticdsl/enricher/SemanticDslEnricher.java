@@ -1,16 +1,16 @@
 package org.example.nlp2dsl2sql.semanticdsl.enricher;
 
 import org.example.nlp2dsl2sql.semanticdsl.metadata.IDslMetaDataService;
-import org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslDimension;
-import org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslDimensionValue;
-import org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslEntity;
-import org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslFilter;
-import org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslMetric;
-import org.example.nlp2dsl2sql.semanticdsl.metadata.entity.DslRelation;
-import org.example.nlp2dsl2sql.semanticdsl.model.DslCandidate;
-import org.example.nlp2dsl2sql.semanticdsl.model.EnrichedQueryDSL;
-import org.example.nlp2dsl2sql.semanticdsl.model.SemanticFilter;
-import org.example.nlp2dsl2sql.semanticdsl.model.SemanticQueryDSL;
+import org.example.nlp2dsl2sql.models.entity.dsl.DslDimension;
+import org.example.nlp2dsl2sql.models.entity.dsl.DslDimensionValue;
+import org.example.nlp2dsl2sql.models.entity.dsl.DslEntity;
+import org.example.nlp2dsl2sql.models.entity.dsl.DslFilter;
+import org.example.nlp2dsl2sql.models.entity.dsl.DslMetric;
+import org.example.nlp2dsl2sql.models.entity.dsl.DslRelation;
+import org.example.nlp2dsl2sql.models.dto.dsl.DslCandidate;
+import org.example.nlp2dsl2sql.models.dto.dsl.EnrichedQueryDSL;
+import org.example.nlp2dsl2sql.models.dto.dsl.SemanticFilter;
+import org.example.nlp2dsl2sql.models.dto.dsl.SemanticQueryDSL;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
