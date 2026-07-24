@@ -54,12 +54,9 @@ public class Nlp2dsl2sqlAgentServiceImpl implements INlp2dsl2sqlAgentService {
         }
 
         String trimmed = question.trim();
-        // 每次查询使用独立 session，避免复用历史对话直接“背答案”跳过工具链。
-        // 若需要多轮对话，应由前端传入稳定的 sessionId。
         AgentSessionContext session = new AgentSessionContext();
 
-        //同一 (userId, sessionId) 的请求自动串行化（不会并发写同一份状态）；
-        // 不同 session 完全并行
+        // userId / sessionId 写死；同会话多轮走 Harness Memory
         RuntimeContext ctx = RuntimeContext.builder()
                 .userId("lsy")
                 .sessionId("0901")
@@ -71,7 +68,6 @@ public class Nlp2dsl2sqlAgentServiceImpl implements INlp2dsl2sqlAgentService {
         return nlp2dsl2sqlAgentLatest
                 .streamEvents(new UserMessage(trimmed), ctx)
                 .mapNotNull(this::mapEventToSseChunk)
-                //這裡是打調試日誌。
                 .doOnNext(chunk -> {
                     if (log.isDebugEnabled()) {
                         log.debug("[SSE] chunk={}", abbreviate(chunk));

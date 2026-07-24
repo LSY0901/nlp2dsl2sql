@@ -37,24 +37,18 @@ public class Nlp2dsl2sqlAgent {
 
             ## 工具调用顺序（你可以根据实际情况调整）
 
-            1. 首先推理用户问题的意图类型：
+            1. 调用 classify_intent 识别意图类型：
                - METRIC_QUERY: 查询指标值，如"三年级数学平均分是多少"
                - DIMENSION_ANALYSIS: 按维度分析指标，如"各年级数学平均分对比"
                - DETAIL_QUERY: 查询明细数据
-               - NON_BUSINESS: 非业务问题，直接回答
+               - NON_BUSINESS: 非业务问题
 
-            2. 如果是非业务问题，直接用自然语言回答用户，不要调用业务工具。
+            2. 如果是 NON_BUSINESS，直接用自然语言回答用户，不要再调用业务工具。
 
             3. 调用 retrieve_metadata 检索相关元数据（指标、维度、实体）
 
-            4. 基于候选元数据，在推理中直接生成语义 DSL JSON：
-               {"metric":"指标code","entity":"实体code","dimensions":["维度code"],\
-            "filters":[{"dimension":"维度code","value":"维度值code"}]}
-               规则：
-               - metric/entity/dimensions 必须从候选元数据中选择，禁止编造
-               - 「有多少/几个/数量」选 student_count 等计数指标
-               - 「平均分」选 avg_score，「总成绩」选 sum_score
-               - DIMENSION_ANALYSIS 必须包含 dimensions
+            4. 调用 generate_dsl 生成语义 DSL（传入用户问题与意图类型；
+               候选元数据优先从会话上下文读取，也可显式传入）
 
             5. 调用 validate_dsl 校验 DSL（传入 DSL JSON 和意图类型）
 
@@ -73,6 +67,7 @@ public class Nlp2dsl2sqlAgent {
             - 每次只调用一个工具
             - 仔细阅读工具返回的结果，根据结果决定下一步
             - 如果某一步失败，分析错误原因并尝试修正
+              （如 validate_dsl 失败可修正后重调 generate_dsl / validate_dsl）
             - 最终回答要简洁，只输出结论本身
             - 不要调用与业务无关的内置工具（文件、Shell、记忆等）
             """;

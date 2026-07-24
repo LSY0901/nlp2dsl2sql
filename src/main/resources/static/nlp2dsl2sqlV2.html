@@ -267,6 +267,8 @@
                 onclick="switchMode('multiAgent')">agent-tools-ReAct</button>
         <button class="mode-btn" id="modePlanner"
                 onclick="switchMode('plannerWorkflow')">Planner-Workflow</button>
+        <button class="mode-btn" id="modeSkill"
+                onclick="switchMode('agentSkillWorkflow')">Agent-Skill-Workflow</button>
     </div>
 </header>
 
@@ -303,6 +305,8 @@
                 'active', mode === 'multiAgent');
         document.getElementById('modePlanner').classList.toggle(
                 'active', mode === 'plannerWorkflow');
+        document.getElementById('modeSkill').classList.toggle(
+                'active', mode === 'agentSkillWorkflow');
         userInput.focus();
     }
 
@@ -315,6 +319,9 @@
         }
         if (currentMode === 'plannerWorkflow') {
             return `${API_BASE_URL}/aiChat/nlp2Dsl2SqlPlannerWorkflow`;
+        }
+        if (currentMode === 'agentSkillWorkflow') {
+            return `${API_BASE_URL}/aiChat/nlp2Dsl2SqlAgentSkillWorkflow`;
         }
         return `${API_BASE_URL}/aiChat/nlp2Dsl2SqlAgentV2`;
     }

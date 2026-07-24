@@ -12,8 +12,9 @@ import reactor.core.publisher.Flux;
  * <pre>
  * 用户问题
  *   │
+ *   ├─ [Tool] classify_intent    → 意图识别
  *   ├─ [Tool] retrieve_metadata  → 语义检索（向量 + Rerank）
- *   ├─ [LLM]  Supervisor 推理    → 意图识别 + 语义 DSL 生成
+ *   ├─ [Tool] generate_dsl       → 语义 DSL 生成
  *   ├─ [Tool] validate_dsl       → DSL 校验
  *   ├─ [Tool] enrich_dsl         → DSL 富化（BFS JOIN）
  *   ├─ [Tool] translate_sql      → SQL 翻译

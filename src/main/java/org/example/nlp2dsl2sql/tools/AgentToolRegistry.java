@@ -26,13 +26,57 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AgentToolRegistry {
 
+    private final IntentTool intentTool;
     private final RetrievalTool retrievalTool;
     private final CandidateContextTool candidateContextTool;
+    private final DslGenerationTool dslGenerationTool;
     private final ValidationTool validationTool;
     private final EnrichmentTool enrichmentTool;
     private final TranslationTool translationTool;
     private final SqlExecutionTool sqlExecutionTool;
     private final ReviewTool reviewTool;
+
+    /**
+     * 意图识别：判断用户问题属于哪类查询意图。
+     *
+     * @param question 用户自然语言问题
+     * @param session  本次查询会话上下文（框架注入）
+     * @return 意图识别结果文本
+     */
+    @Tool(name = "classify_intent",
+            description = """
+                    作用：
+                    识别用户自然语言问题的业务意图类型。
+                    
+                    适用场景：
+                    - 收到用户问题后，首先判断查询类型。
+                    - 需要区分指标查询、维度分析、明细查询与非业务问题。
+                    
+                    意图类型：
+                    - METRIC_QUERY: 查询单个指标值。
+                    - DIMENSION_ANALYSIS: 按维度对比/分析指标。
+                    - DETAIL_QUERY: 查询明细数据。
+                    - NON_BUSINESS: 非业务问题，无需走查询管线。
+                    
+                    输入：
+                    用户原始问题。
+                    
+                    输出：
+                    返回 intent、confidence、reason。
+                    
+                    限制：
+                    只负责意图分类，不检索元数据，不生成DSL，不执行SQL。
+                    """)
+    public String classifyIntent(
+            @ToolParam(name = "question", description = "用户原始自然语言问题")
+            String question,
+            AgentSessionContext session) {
+        log.info("━━━ [ReAct] 执行工具: classify_intent ━━━");
+        IntentResult result = intentTool.classify(question);
+        session.setIntentResult(result);
+        session.setIntent(result.getIntent());
+        return "意图识别完成。结果: " + JSON.toJSONString(result);
+    }
 
     /**
      * 语义检索：向量召回 + 同义词扩展 + Rerank。
@@ -44,7 +88,7 @@ public class AgentToolRegistry {
     @Tool(name = "retrieve_metadata",
             description = """
                     作用：
-                    根据用户自然语言问题检索业务语义元数据，为查询理解提供业务上下文。
+                    根据用户自然语言问题检索业务语义元数据，为DSL生成提供候选集。
                     
                     适用场景：
                     - 用户提出数据查询或分析需求。
@@ -60,7 +104,7 @@ public class AgentToolRegistry {
                     用户原始问题。
                     
                     输出：
-                    返回候选指标、维度、实体、维度值及对应业务描述。
+                    返回候选指标、维度、实体、维度值、同义词提示及业务描述。
                     
                     限制：
                     仅负责语义元数据检索，不生成DSL，不生成SQL，不执行数据库查询。
@@ -80,6 +124,104 @@ public class AgentToolRegistry {
     }
 
     /**
+     * 生成语义 DSL：基于问题、意图与候选元数据调用 LLM。
+     *
+     * @param question       用户问题
+     * @param intent         意图类型
+     * @param candidateText  候选元数据文本（可空，空则用 session）
+     * @param session        本次查询会话上下文（框架注入）
+     * @return 生成的 DSL JSON 文本
+     */
+    @Tool(name = "generate_dsl",
+            description = """
+                    作用：
+                    根据用户问题、意图类型和候选元数据生成语义查询DSL。
+                    
+                    适用场景：
+                    - 已完成意图识别与元数据检索，需要生成SemanticQueryDSL。
+                    - validate_dsl失败后需要按错误信息重新生成DSL。
+                    
+                    处理能力：
+                    - 从候选集中选择metric/entity/dimensions/filters。
+                    - 按意图规则补全必填字段。
+                    - 输出结构化SemanticQueryDSL JSON。
+                    
+                    输入：
+                    用户问题、意图类型；候选元数据可显式传入，
+                    或从会话上下文中的检索结果读取。
+                    
+                    输出：
+                    返回SemanticQueryDSL JSON：
+                    {metric,entity,dimensions,filters}。
+                    
+                    限制：
+                    只负责生成语义DSL，不校验、不富化、不生成SQL。
+                    禁止编造候选集中不存在的code。
+                    """)
+    public String generateDsl(
+            @ToolParam(name = "question", description = "用户原始自然语言问题")
+            String question,
+            @ToolParam(name = "intent",
+                    description = "意图类型: METRIC_QUERY / DIMENSION_ANALYSIS / "
+                            + "DETAIL_QUERY（来自 classify_intent）")
+            String intent,
+            @ToolParam(name = "candidate_text", required = false,
+                    description = "候选元数据文本（可空；为空时优先使用"
+                            + "retrieve_metadata写入会话的上下文）")
+            String candidateText,
+            AgentSessionContext session) {
+        log.info("━━━ [ReAct] 执行工具: generate_dsl ━━━");
+        try {
+            IntentResult.IntentType intentType =
+                    IntentResult.parseIntentType(intent);
+            if (session.getIntent() == null) {
+                session.setIntent(intentType.name());
+            }
+
+            String context = resolveCandidateText(candidateText, question, session);
+            SemanticQueryDSL dsl = dslGenerationTool.generateWithContext(
+                    question, intentType, context);
+            String dslJson = JSON.toJSONString(dsl);
+
+            session.setDsl(dsl);
+            session.setDslJson(dslJson);
+
+            return "DSL生成完成。DSL: " + dslJson;
+        } catch (Exception e) {
+            return "DSL生成失败: " + e.getMessage()
+                    + "。请检查候选元数据后重试 generate_dsl。";
+        }
+    }
+
+    /**
+     * 解析候选元数据文本：优先入参，其次 session，最后按问题重新检索。
+     *
+     * @param candidateText 显式传入的候选文本
+     * @param question      用户问题
+     * @param session       会话上下文
+     * @return 候选元数据文本
+     */
+    private String resolveCandidateText(String candidateText,
+                                        String question,
+                                        AgentSessionContext session) {
+        if (candidateText != null && !candidateText.isBlank()) {
+            return candidateText;
+        }
+        if (session.getCandidateContext() != null
+                && !session.getCandidateContext().isBlank()) {
+            return session.getCandidateContext();
+        }
+        DslCandidate candidate = session.getCandidate();
+        if (candidate == null) {
+            candidate = retrievalTool.retrieve(question);
+            session.setCandidate(candidate);
+        }
+        String context = candidateContextTool.buildCandidateContext(candidate);
+        session.setCandidateContext(context);
+        return context;
+    }
+
+    /**
      * 校验语义 DSL 合法性与兼容性。
      *
      * @param dsl     语义 DSL JSON
@@ -93,15 +235,16 @@ public class AgentToolRegistry {
                     验证语义DSL是否符合系统定义和业务查询规则。
                     
                     适用场景：
-                    - 已生成SemanticQueryDSL，需要判断是否有效。
-                    - 需要检查指标、维度、过滤条件之间的业务兼容性。
+                    - 已通过generate_dsl生成SemanticQueryDSL，需要判断是否有效。
+                    - 需要检查指标、维度、过滤条件是否合法。
                     
                     校验内容：
-                    - DSL结构是否合法。
+                    - 按意图检查必填字段（metric/entity/dimensions）。
                     - 指标是否存在。
                     - 维度是否有效。
-                    - 指标与维度组合是否支持。
+                    - 实体与指标是否匹配。
                     - 过滤条件是否符合规则。
+                    （指标与维度兼容性仅做告警，不作为硬失败。）
                     
                     输入：
                     语义DSL JSON以及查询意图类型。
@@ -117,7 +260,8 @@ public class AgentToolRegistry {
                     description = "语义DSL的JSON字符串，格式: {metric,entity,dimensions,filters}")
             String dsl,
             @ToolParam(name = "intent",
-                    description = "意图类型: METRIC_QUERY / DIMENSION_ANALYSIS / DETAIL_QUERY")
+                    description = "意图类型: METRIC_QUERY / DIMENSION_ANALYSIS / "
+                            + "DETAIL_QUERY（来自 classify_intent）")
             String intent,
             AgentSessionContext session) {
         log.info("━━━ [ReAct] 执行工具: validate_dsl ━━━");
@@ -132,7 +276,7 @@ public class AgentToolRegistry {
                 return "DSL校验通过。DSL: " + dsl;
             }
             return "DSL校验失败，错误: " + result.errors()
-                    + "。请修正DSL后重新调用 validate_dsl。";
+                    + "。请调用 generate_dsl 重新生成，或修正后再次 validate_dsl。";
         } catch (Exception e) {
             return "DSL解析失败: " + e.getMessage() + "。请确保DSL是合法JSON。";
         }

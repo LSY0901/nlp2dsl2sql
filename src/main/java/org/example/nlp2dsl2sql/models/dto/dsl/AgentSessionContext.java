@@ -14,6 +14,12 @@ import java.util.Map;
 @Data
 public class AgentSessionContext {
 
+    /** 意图类型名，如 METRIC_QUERY */
+    private String intent;
+
+    /** 意图识别完整结果 */
+    private IntentResult intentResult;
+
     /** 检索候选集 */
     private DslCandidate candidate;
 
