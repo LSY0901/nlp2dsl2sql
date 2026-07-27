@@ -16,6 +16,21 @@ agentscope:
     api-key: sk-51f1c38aa5e0436db2c623337a8d9f83
     base-url: https://api.deepseek.com
     model-name: deepseek-v4-pro
+  a2a:
+    server:
+      enabled: true
+      card:
+        name: sql-query-agent
+        description: 自然语言业务数据查询（NLP→DSL→SQL）
+
+a2a:
+  sql-agent:
+    base-url: http://127.0.0.1:8079
+    agent-card-path: /.well-known/agent-card.json
+  sop-agent:
+    base-url: http://127.0.0.1:9002
+    agent-card-path: /.well-known/agent-card.json
+    timeout-ms: 60000
 
 embedding:
   base-url: http://localhost:8082
