@@ -11,11 +11,11 @@ import org.example.nlp2dsl2sql.tools.DslRetriever;
 import org.example.nlp2dsl2sql.semanticdsl.translator.DslTranslator;
 import org.example.nlp2dsl2sql.semanticdsl.validator.SemanticDslValidator;
 import org.example.nlp2dsl2sql.service.ISemanticDslAgentService;
+import org.example.nlp2dsl2sql.tools.IntentTool;
 import org.example.nlp2dsl2sql.tools.ReviewTool;
 import org.example.nlp2dsl2sql.tools.SqlExecuteTool;
 import com.alibaba.fastjson2.JSON;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.agentscope.core.formatter.ResponseFormat;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.message.TextBlock;
@@ -47,6 +47,7 @@ public class SemanticDslAgentServiceImpl implements ISemanticDslAgentService {
     private final DslTranslator dslTranslator;
     private final ReviewTool reviewTool;
     private final SqlExecuteTool sqlExecuteTool;
+    private final IntentTool intentTool;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -146,32 +147,7 @@ public class SemanticDslAgentServiceImpl implements ISemanticDslAgentService {
 
     @Override
     public IntentResult classifyIntent(String question) {
-        // DeepSeek 不支持 json_schema response_format，使用 jsonObject（提示词中已含格式说明）
-        GenerateOptions options = GenerateOptions.builder()
-                .responseFormat(ResponseFormat.jsonObject())
-                .temperature(0.2)
-                .build();
-
-        String response = callLlm(
-                SemanticPromptTemplates.INTENT_SYSTEM_PROMPT,
-                question,
-                options
-        );
-
-        try {
-            String json = extractJson(response);
-            IntentResult result = objectMapper.readValue(json, IntentResult.class);
-            IntentResult.IntentType type = result.resolveIntentType();
-            result.setIntent(type.name());
-            return result;
-        } catch (Exception e) {
-            log.warn("意图识别解析失败，默认为NON_BUSINESS: {}", e.getMessage());
-            IntentResult fallback = new IntentResult();
-            fallback.setIntent(IntentResult.IntentType.NON_BUSINESS.name());
-            fallback.setConfidence(0.0);
-            fallback.setReason("解析失败: " + e.getMessage());
-            return fallback;
-        }
+        return intentTool.classify(question);
     }
 
 
