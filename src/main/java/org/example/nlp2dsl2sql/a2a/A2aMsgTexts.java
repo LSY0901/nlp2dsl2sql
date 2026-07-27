@@ -12,7 +12,7 @@ public final class A2aMsgTexts {
     }
 
     /**
-     * 提取消息中全部 TextBlock 内容并拼接。
+     * 提取消息中全部 TextBlock 内容并按出现顺序拼接（块之间无分隔符）。
      *
      * @param msg A2A / Agent 返回消息，可为 null
      * @return 文本；空则返回空串
