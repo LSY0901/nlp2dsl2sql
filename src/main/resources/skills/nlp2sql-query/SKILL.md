@@ -1,5 +1,5 @@
 ---
-name: nlp2sql_query
+name: nlp2sql-query
 description: >
   将自然语言业务问题转为语义DSL并查询数据库。
   适用于指标查询、维度分析、明细数据查询。

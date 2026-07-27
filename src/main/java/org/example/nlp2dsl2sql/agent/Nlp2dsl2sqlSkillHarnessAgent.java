@@ -25,7 +25,7 @@ import java.nio.file.Paths;
 public class Nlp2dsl2sqlSkillHarnessAgent {
 
     /** 与 SKILL.md frontmatter name 一致 */
-    public static final String SKILL_NLP2SQL_QUERY = "nlp2sql_query";
+    public static final String SKILL_NLP2SQL_QUERY = "nlp2sql-query";
 
     /** 与 SKILL.md frontmatter name 一致 */
     public static final String SKILL_CHITCHAT = "chitchat";
