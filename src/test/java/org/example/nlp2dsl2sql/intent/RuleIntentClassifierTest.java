@@ -39,9 +39,10 @@ class RuleIntentClassifierTest {
 
     /**
      * 含「各年级」「对比」应命中 DIMENSION_ANALYSIS。
+     * 同时含 METRIC 特征（平均分）时仍优先 DIMENSION。
      */
     @Test
-    void tryMatch_dimensionAnalysis_whenCompareGrades() {
+    void tryMatch_dimensionAnalysis_whenDimensionAndMetricBothHit() {
         Optional<IntentResult> result =
                 classifier.tryMatch("各年级数学平均分对比");
 
@@ -77,6 +78,21 @@ class RuleIntentClassifierTest {
         assertTrue(result.isPresent());
         assertEquals(
                 IntentResult.IntentType.NON_BUSINESS.name(),
+                result.get().getIntent());
+        assertConfidence(result.get());
+    }
+
+    /**
+     * 含闲聊与业务词时排除闲聊，命中 METRIC_QUERY。
+     */
+    @Test
+    void tryMatch_metricQuery_whenGreetingWithBusinessWords() {
+        Optional<IntentResult> result =
+                classifier.tryMatch("你好，平均分是多少");
+
+        assertTrue(result.isPresent());
+        assertEquals(
+                IntentResult.IntentType.METRIC_QUERY.name(),
                 result.get().getIntent());
         assertConfidence(result.get());
     }

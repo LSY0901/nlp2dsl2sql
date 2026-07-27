@@ -9,7 +9,10 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * 高置信关键词意图规则：唯一命中才返回结果，否则 empty 交 LLM。
+ * 高置信关键词意图规则。
+ * <p>
+ * 单一业务命中直接返回；多业务命中时按优先级选取（DIMENSION &gt; DETAIL &gt; METRIC）。
+ * DIMENSION 与 DETAIL 同时命中为硬冲突，返回 empty 交 LLM。
  */
 @Component
 public class RuleIntentClassifier {
@@ -32,7 +35,7 @@ public class RuleIntentClassifier {
      * 尝试用规则识别意图。
      *
      * @param question 用户问题
-     * @return 唯一命中时的结果；未命中或冲突为空
+     * @return 命中或按优先级消解后的结果；未命中或硬冲突为空
      */
     public Optional<IntentResult> tryMatch(String question) {
         if (question == null || question.isBlank()) {

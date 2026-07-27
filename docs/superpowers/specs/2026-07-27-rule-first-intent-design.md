@@ -95,10 +95,12 @@ NON_BUSINESS 仅在「闲聊特征命中且无明显业务词」时成立。
 
 ### 4.3 冲突判定
 
-- 同时命中 DIMENSION 与 DETAIL → miss  
-- 同时命中 DIMENSION 与 METRIC（且都有强特征）→ miss  
-- 仅 METRIC 特征 → hit METRIC  
-- 全无特征 → miss → LLM  
+- 同时命中 DIMENSION 与 DETAIL → miss（硬冲突，交 LLM）
+- 同时命中 DIMENSION 与 METRIC → 按优先级取 DIMENSION（非 miss）
+- 同时命中 DETAIL 与 METRIC → 按优先级取 DETAIL（非 miss）
+- 业务意图优先级：DIMENSION > DETAIL > METRIC
+- 仅 METRIC 特征 → hit METRIC
+- 全无特征 → miss → LLM
 
 ---
 
