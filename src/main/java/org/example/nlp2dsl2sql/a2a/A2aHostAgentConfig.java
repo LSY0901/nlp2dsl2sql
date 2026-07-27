@@ -36,6 +36,8 @@ public class A2aHostAgentConfig {
                 .toolkit(toolkit)
                 .maxIters(10)
                 .workspace(Paths.get(".agentscope/workspace-a2a-host"))
+                // SSE 中断时会话可能残留未完成的 tool_call；开启后自动补错误结果继续对话。
+                .enablePendingToolRecovery(true)
                 .disableFilesystemTools()
                 .disableShellTool()
                 .disableSubagents()

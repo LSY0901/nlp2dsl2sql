@@ -53,8 +53,8 @@ public class A2aHostServiceImpl implements IA2aHostService {
 
         String trimmed = question.trim();
         RuntimeContext ctx = RuntimeContext.builder()
-                .userId("a2a-host")
-                .sessionId("a2a-" + System.currentTimeMillis())
+                .userId("lsy")
+                .sessionId("0901")
                 .build();
 
         log.info("━━━━━━━ A2A Host 启动 ━━━━━━━ question={}", trimmed);

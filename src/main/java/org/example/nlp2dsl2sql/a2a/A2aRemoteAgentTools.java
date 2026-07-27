@@ -60,8 +60,9 @@ public class A2aRemoteAgentTools {
      * @return 远端回答文本或错误说明
      */
     @Tool(name = "call_sop_agent", description = """
-            将规范/流程/奖励类子问题发给 SOP Agent（A2A）。
-            适用于操作规范、奖励政策、SOP 文档问答。
+            将规范/流程/奖励/业务说明/领域概念类子问题发给 SOP Agent（A2A）。
+            适用于操作规范、奖励政策、SOP 文档问答，以及「XX是干什么的」等业务概念说明。
+            此类问题必须调用本工具，禁止 Host 自行回答。
             """)
     public String callSopAgent(
             @ToolParam(name = "query", description = "子问题原文") String query) {

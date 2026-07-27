@@ -96,6 +96,8 @@ public class Nlp2dsl2sqlAgent {
                 // 最多 15 轮
                 .maxIters(15)
                 .workspace(Paths.get(".agentscope/workspace"))
+                // SSE 中断时会话可能残留未完成的 tool_call；开启后自动补错误结果继续对话。
+                .enablePendingToolRecovery(true)
                 // 关闭与 NLP→SQL 无关的内置工具，避免干扰业务 ReAct。
                 // 注意：不要 disableMemoryHooks —— 会话 JSONL / MEMORY 写入依赖它。
 //                .disableFilesystemTools()

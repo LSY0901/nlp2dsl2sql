@@ -269,6 +269,8 @@
                 onclick="switchMode('plannerWorkflow')">Planner-Workflow</button>
         <button class="mode-btn" id="modeSkill"
                 onclick="switchMode('agentSkillWorkflow')">Agent-Skill-Workflow</button>
+        <button class="mode-btn" id="modeA2aHost"
+                onclick="switchMode('a2aHost')">A2A Host</button>
     </div>
 </header>
 
@@ -307,6 +309,8 @@
                 'active', mode === 'plannerWorkflow');
         document.getElementById('modeSkill').classList.toggle(
                 'active', mode === 'agentSkillWorkflow');
+        document.getElementById('modeA2aHost').classList.toggle(
+                'active', mode === 'a2aHost');
         userInput.focus();
     }
 
@@ -322,6 +326,9 @@
         }
         if (currentMode === 'agentSkillWorkflow') {
             return `${API_BASE_URL}/aiChat/nlp2Dsl2SqlAgentSkillWorkflow`;
+        }
+        if (currentMode === 'a2aHost') {
+            return `${API_BASE_URL}/aiChat/a2aHost`;
         }
         return `${API_BASE_URL}/aiChat/nlp2Dsl2SqlAgentV2`;
     }

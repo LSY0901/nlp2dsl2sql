@@ -13,7 +13,7 @@ agentscope:
   model:
     provider: openai
   openai:
-    api-key: sk-51f1c38aa5e0436db2c623337a8d9f83
+    api-key: sk-xxxxx
     base-url: https://api.deepseek.com
     model-name: deepseek-v4-pro
   a2a:
@@ -28,7 +28,7 @@ a2a:
     base-url: http://127.0.0.1:8079
     agent-card-path: /.well-known/agent-card.json
   sop-agent:
-    base-url: http://127.0.0.1:9002
+    base-url: http://127.0.0.1:9003
     agent-card-path: /.well-known/agent-card.json
     timeout-ms: 60000
 
