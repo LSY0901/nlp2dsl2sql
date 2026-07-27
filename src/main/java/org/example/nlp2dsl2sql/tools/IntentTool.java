@@ -10,14 +10,16 @@ import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.nlp2dsl2sql.intent.RuleIntentClassifier;
 import org.example.nlp2dsl2sql.models.dto.dsl.IntentResult;
 import org.example.nlp2dsl2sql.prompt.SemanticPromptTemplates;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
- * 意图识别工具：调用 LLM 判断用户问题意图类型。
+ * 意图识别工具：优先规则匹配，未命中时调用 LLM 判断用户问题意图类型。
  * <p>
  * 复用 {@link SemanticPromptTemplates#INTENT_SYSTEM_PROMPT}。
  */
@@ -28,15 +30,34 @@ public class IntentTool {
 
     private final OpenAIChatModel openAIChatModel;
     private final ObjectMapper objectMapper;
+    private final RuleIntentClassifier ruleIntentClassifier;
 
     /**
-     * 识别用户问题的意图类型。
+     * 识别用户问题的意图类型：先尝试规则匹配，未命中再调用 LLM。
      *
      * @param question 用户自然语言问题
      * @return 意图识别结果
      */
     public IntentResult classify(String question) {
         log.info("━━━ [Multi-Agent] IntentTool 启动 ━━━");
+        Optional<IntentResult> ruled = ruleIntentClassifier.tryMatch(question);
+        if (ruled.isPresent()) {
+            IntentResult result = ruled.get();
+            log.info("[Intent] RULE hit: {} reason={}",
+                    result.getIntent(), result.getReason());
+            return result;
+        }
+        log.info("[Intent] RULE miss → LLM");
+        return classifyByLlm(question);
+    }
+
+    /**
+     * 通过 LLM 识别用户问题的意图类型。
+     *
+     * @param question 用户自然语言问题
+     * @return 意图识别结果
+     */
+    private IntentResult classifyByLlm(String question) {
         GenerateOptions options = GenerateOptions.builder()
                 .responseFormat(ResponseFormat.jsonObject())
                 .temperature(0.2)
