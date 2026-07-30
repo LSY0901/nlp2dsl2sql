@@ -13,7 +13,10 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 
 /**
- * Host 可调用的 A2A 远程 Agent 工具（必须经 A2aAgent.call）。
+ * Host 可调用的远程/本地 Agent 工具。
+ * <p>
+ * SQL：A2A Host 场景走本地 HITL；无 Host 上下文时回退 A2A。
+ * SOP：始终 A2A。
  */
 @Slf4j
 @Component
@@ -22,34 +25,49 @@ public class A2aRemoteAgentTools {
     private final A2aAgent sqlAgent;
     private final A2aAgent sopAgent;
     private final A2aClientProperties clientProperties;
+    private final A2aSqlHitlRunner sqlHitlRunner;
 
     /**
-     * @param sqlAgent         本机 SQL A2A 客户端
+     * @param sqlAgent         本机 SQL A2A 客户端（兜底）
      * @param sopAgent         远端 SOP A2A 客户端
      * @param clientProperties A2A 超时等连接配置
+     * @param sqlHitlRunner    Host SQL HITL 执行器
      */
     public A2aRemoteAgentTools(
             @Qualifier("sqlQueryA2aAgent") A2aAgent sqlAgent,
             @Qualifier("sopDocA2aAgent") A2aAgent sopAgent,
-            A2aClientProperties clientProperties) {
+            A2aClientProperties clientProperties,
+            A2aSqlHitlRunner sqlHitlRunner) {
         this.sqlAgent = sqlAgent;
         this.sopAgent = sopAgent;
         this.clientProperties = clientProperties;
+        this.sqlHitlRunner = sqlHitlRunner;
     }
 
     /**
-     * 调用 SQL 查询 Agent。
+     * 调用 SQL 查询 Agent（Host 下为本地 HITL）。
      *
-     * @param query 可独立回答的数据子问题
-     * @return 远端回答文本或错误说明
+     * @param query   可独立回答的数据子问题
+     * @param hostCtx Host SSE 上下文（RuntimeContext 注入；可为 null）
+     * @return 回答文本或错误说明
      */
     @Tool(name = "call_sql_agent", description = """
-            将数据查询类子问题发给 SQL Agent（A2A）。
+            将数据查询类子问题发给 SQL Agent。
             适用于指标、对比、明细、最高分是谁等需要查库的问题。
+            执行 SQL 前可能需要用户确认。
             """)
     public String callSqlAgent(
-            @ToolParam(name = "query", description = "子问题原文") String query) {
+            @ToolParam(name = "query", description = "子问题原文") String query,
+            A2aHostChatContext hostCtx) {
+        if (query == null || query.isBlank()) {
+            return "SQL Agent 调用失败: query 为空";
+        }
         long timeoutMs = clientProperties.getSqlAgent().getTimeoutMs();
+        if (hostCtx != null) {
+            log.info("[HITL] 本地 SQL Agent, sessionId={}, query={}",
+                    hostCtx.getSessionId(), query);
+            return sqlHitlRunner.run(query.trim(), hostCtx, timeoutMs);
+        }
         return callRemote("SQL", sqlAgent, query, timeoutMs);
     }
 
@@ -73,10 +91,10 @@ public class A2aRemoteAgentTools {
     /**
      * 统一 A2A 调用与错误包装。
      *
-     * @param label      日志标签
-     * @param agent      A2aAgent
-     * @param query      子问题
-     * @param timeoutMs  阻塞等待超时毫秒
+     * @param label     日志标签
+     * @param agent     A2aAgent
+     * @param query     子问题
+     * @param timeoutMs 阻塞等待超时毫秒
      * @return 文本结果
      */
     private String callRemote(
@@ -89,7 +107,7 @@ public class A2aRemoteAgentTools {
             Duration timeout = Duration.ofMillis(timeoutMs);
             Msg msg = agent.call(new UserMessage(query.trim())).block(timeout);
             String text = A2aMsgTexts.extract(msg);
-            if (text == null || text.isBlank()) {
+            if (text.isBlank()) {
                 return label + " Agent 返回空内容";
             }
             return text;

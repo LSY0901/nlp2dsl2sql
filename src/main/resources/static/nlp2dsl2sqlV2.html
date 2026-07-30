@@ -254,6 +254,55 @@
         .mode-btn:not(.active):hover {
             background: #e5e7eb;
         }
+
+        .sql-confirm-panel {
+            margin-top: 12px;
+            padding: 12px;
+            border: 1px solid #f59e0b;
+            background: #fffbeb;
+            border-radius: 10px;
+        }
+
+        .sql-confirm-panel .sql-confirm-title {
+            font-weight: 600;
+            color: #92400e;
+            margin-bottom: 8px;
+        }
+
+        .sql-confirm-panel pre {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 10px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 13px;
+            white-space: pre-wrap;
+            margin-bottom: 8px;
+        }
+
+        .sql-confirm-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .sql-confirm-row input {
+            flex: 1;
+            border: 1px solid #f59e0b;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 14px;
+        }
+
+        .sql-confirm-row button {
+            border: none;
+            background: #d97706;
+            color: #fff;
+            border-radius: 8px;
+            padding: 8px 14px;
+            cursor: pointer;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -298,6 +347,16 @@
     const sendBtn = document.getElementById('sendBtn');
     let isStreaming = false;
     let currentMode = 'workflow';
+    let a2aSessionId = null;
+    let awaitingSqlConfirm = false;
+    let sqlConfirmPanelShownFor = '';
+
+    function newSessionId() {
+        if (window.crypto && crypto.randomUUID) {
+            return crypto.randomUUID();
+        }
+        return 'sid-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+    }
 
     function switchMode(mode) {
         currentMode = mode;
@@ -311,6 +370,12 @@
                 'active', mode === 'agentSkillWorkflow');
         document.getElementById('modeA2aHost').classList.toggle(
                 'active', mode === 'a2aHost');
+        if (mode === 'a2aHost') {
+            a2aSessionId = newSessionId();
+            awaitingSqlConfirm = false;
+            sqlConfirmPanelShownFor = '';
+            userInput.placeholder = '输入你的问题...';
+        }
         userInput.focus();
     }
 
@@ -328,9 +393,112 @@
             return `${API_BASE_URL}/aiChat/nlp2Dsl2SqlAgentSkillWorkflow`;
         }
         if (currentMode === 'a2aHost') {
-            return `${API_BASE_URL}/aiChat/a2aHost`;
+            if (!a2aSessionId) {
+                a2aSessionId = newSessionId();
+            }
+            return `${API_BASE_URL}/aiChat/a2aHost`
+                    + `?sessionId=${encodeURIComponent(a2aSessionId)}`;
         }
         return `${API_BASE_URL}/aiChat/nlp2Dsl2SqlAgentV2`;
+    }
+
+    /**
+     * 从 HITL 标记文本中解析待确认 SQL。
+     */
+    function parsePendingSql(text) {
+        const mark = '[SQL确认待审批]';
+        const idx = text.lastIndexOf(mark);
+        if (idx < 0) {
+            return null;
+        }
+        const slice = text.slice(idx);
+        const sqlMatch = slice.match(/sql:\n([\s\S]*?)\n==========/);
+        return sqlMatch ? sqlMatch[1].trim() : '';
+    }
+
+    /**
+     * 展示 SQL 确认面板（同一段待审批只展示一次）。
+     */
+    function ensureSqlConfirmPanel(bubble, fullText) {
+        const mark = '[SQL确认待审批]';
+        if (!fullText.includes(mark)) {
+            return;
+        }
+        const key = String(fullText.lastIndexOf(mark));
+        if (sqlConfirmPanelShownFor === key
+                && bubble.querySelector('.sql-confirm-panel')) {
+            return;
+        }
+        sqlConfirmPanelShownFor = key;
+        awaitingSqlConfirm = true;
+        userInput.placeholder = '输入 yes 或 确认';
+        let panel = bubble.querySelector('.sql-confirm-panel');
+        if (!panel) {
+            panel = document.createElement('div');
+            panel.className = 'sql-confirm-panel';
+            bubble.appendChild(panel);
+        }
+        const sql = parsePendingSql(fullText) || '(解析中...)';
+        panel.innerHTML =
+                '<div class="sql-confirm-title">请确认 SQL 无误后输入 yes 或 确认</div>'
+                + '<pre>' + escapeHtml(sql) + '</pre>'
+                + '<div class="sql-confirm-row">'
+                + '<input id="sqlConfirmInput" type="text" '
+                + 'placeholder="yes / 确认" />'
+                + '<button type="button" id="sqlConfirmBtn">提交确认</button>'
+                + '</div>';
+        const input = panel.querySelector('#sqlConfirmInput');
+        const btn = panel.querySelector('#sqlConfirmBtn');
+        const submit = () => submitSqlConfirm(input.value);
+        btn.onclick = submit;
+        input.onkeydown = (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                submit();
+            }
+        };
+        input.focus();
+        scrollToBottom();
+    }
+
+    /**
+     * 提交 SQL 确认（服务端以 rawInput 判定）。
+     */
+    async function submitSqlConfirm(rawInput) {
+        if (!awaitingSqlConfirm || !a2aSessionId) {
+            return;
+        }
+        const text = (rawInput || '').trim();
+        if (!text) {
+            return;
+        }
+        try {
+            const resp = await fetch(
+                    `${API_BASE_URL}/aiChat/a2aHost/confirm`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            sessionId: a2aSessionId,
+                            approved: null,
+                            rawInput: text
+                        })
+                    });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok || data.ok === false) {
+                alert(data.message || ('确认失败: ' + resp.status));
+                return;
+            }
+            awaitingSqlConfirm = false;
+            userInput.placeholder = '输入你的问题...';
+            const panel = document.querySelector('.sql-confirm-panel');
+            if (panel) {
+                panel.innerHTML = '<div class="sql-confirm-title">'
+                        + escapeHtml(data.message || '已提交')
+                        + '</div>';
+            }
+        } catch (e) {
+            alert('确认请求失败: ' + e.message);
+        }
     }
 
     if (API_BASE) {
@@ -442,16 +610,29 @@
 
     async function sendMessage() {
         const text = userInput.value.trim();
-        if (!text || isStreaming) return;
+        if (!text) return;
+        if (awaitingSqlConfirm && currentMode === 'a2aHost') {
+            userInput.value = '';
+            await submitSqlConfirm(text);
+            return;
+        }
+        if (isStreaming) return;
         isStreaming = true;
         sendBtn.disabled = true;
         userInput.value = '';
         userInput.style.height = 'auto';
+        if (currentMode === 'a2aHost') {
+            a2aSessionId = newSessionId();
+            sqlConfirmPanelShownFor = '';
+            awaitingSqlConfirm = false;
+        }
         addMessage('user', text);
         const bubble = addStreamingMessage();
         let fullText = '';
         try {
-            const url = `${getApiEndpoint()}?question=${encodeURIComponent(text)}`;
+            const base = getApiEndpoint();
+            const sep = base.includes('?') ? '&' : '?';
+            const url = `${base}${sep}question=${encodeURIComponent(text)}`;
             const resp = await fetch(url);
             if (!resp.ok) {
                 const errText = await resp.text().catch(() => '');
@@ -475,9 +656,26 @@
                         const piece = extractSseEventData(chunk);
                         if (piece) {
                             fullText += piece;
+                            const sidMatch = piece.match(
+                                    /sessionId:\s*([^\s\n]+)/);
+                            if (sidMatch && currentMode === 'a2aHost') {
+                                a2aSessionId = sidMatch[1].trim();
+                            }
                         }
                     }
-                    renderAiBubble(bubble, fullText || '思考中...');
+                    if (currentMode === 'a2aHost'
+                            && fullText.includes('[SQL确认待审批]')) {
+                        bubble.style.whiteSpace = 'pre-wrap';
+                        const panelHtml = bubble.querySelector(
+                                '.sql-confirm-panel');
+                        bubble.textContent = fullText;
+                        if (panelHtml) {
+                            bubble.appendChild(panelHtml);
+                        }
+                        ensureSqlConfirmPanel(bubble, fullText);
+                    } else {
+                        renderAiBubble(bubble, fullText || '思考中...');
+                    }
                     scrollToBottom();
                 }
                 if (buffer.trim()) {
@@ -486,7 +684,14 @@
                         fullText += piece;
                     }
                 }
-                renderAiBubble(bubble, fullText || '(无响应内容)');
+                if (currentMode === 'a2aHost'
+                        && fullText.includes('[SQL确认待审批]')) {
+                    bubble.style.whiteSpace = 'pre-wrap';
+                    bubble.textContent = fullText || '(无响应内容)';
+                    ensureSqlConfirmPanel(bubble, fullText);
+                } else {
+                    renderAiBubble(bubble, fullText || '(无响应内容)');
+                }
             } else {
                 fullText = await resp.text();
                 renderAiBubble(bubble, fullText || '(无响应内容)');

@@ -9,57 +9,70 @@ import io.agentscope.core.event.ToolResultTextDeltaEvent;
 import io.agentscope.core.message.UserMessage;
 import io.agentscope.harness.agent.HarnessAgent;
 import lombok.extern.slf4j.Slf4j;
+import org.example.nlp2dsl2sql.a2a.A2aHostChatContext;
+import org.example.nlp2dsl2sql.a2a.A2aSqlConfirmRegistry;
+import org.example.nlp2dsl2sql.a2a.A2aSqlConfirmTexts;
+import org.example.nlp2dsl2sql.models.vo.A2aHostConfirmRequest;
+import org.example.nlp2dsl2sql.models.vo.A2aHostConfirmResponse;
 import org.example.nlp2dsl2sql.service.IA2aHostService;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
+import java.util.UUID;
+
 /**
- * A2A Host SSE 服务。
- * <p>
- * 通过 {@link HarnessAgent#streamEvents} 真流式输出到前端：
- * LLM token 增量、A2A 远程工具调用进度与返回内容。
+ * A2A Host SSE 服务（含 SQL HITL 确认桥接）。
  */
 @Slf4j
 @Service
 public class A2aHostServiceImpl implements IA2aHostService {
 
     private final HarnessAgent a2aHostAgent;
+    private final A2aSqlConfirmRegistry confirmRegistry;
 
     /**
      * 构造 A2A Host 服务。
      *
-     * @param a2aHostAgent Host Agent
+     * @param a2aHostAgent     Host Agent
+     * @param confirmRegistry  SQL 确认挂起表
      */
     public A2aHostServiceImpl(
-            @Qualifier("a2aHostAgent") HarnessAgent a2aHostAgent) {
+            @Qualifier("a2aHostAgent") HarnessAgent a2aHostAgent,
+            A2aSqlConfirmRegistry confirmRegistry) {
         this.a2aHostAgent = a2aHostAgent;
+        this.confirmRegistry = confirmRegistry;
     }
 
     /**
-     * 启动 Host Agent，流式返回 SSE 文本。
-     * <p>
-     * 订阅后立即启动 ReAct 循环；LLM token 与 A2A 工具事件
-     * 边生成边推送，全程不阻塞等待整段结束。
+     * 启动 Host Agent，合并 Agent 事件流与 HITL SSE 桥。
      *
-     * @param question 用户问题
+     * @param sessionId 会话 ID
+     * @param question  用户问题
      * @return SSE 文本增量流
      */
     @Override
-    public Flux<String> chat(String question) {
+    public Flux<String> chat(String sessionId, String question) {
         if (question == null || question.isBlank()) {
             return Flux.just("错误: 问题不能为空");
         }
 
         String trimmed = question.trim();
+        String sid = (sessionId == null || sessionId.isBlank())
+                ? UUID.randomUUID().toString()
+                : sessionId.trim();
+        A2aHostChatContext hostCtx = new A2aHostChatContext(sid);
+
         RuntimeContext ctx = RuntimeContext.builder()
                 .userId("lsy")
-                .sessionId("0901")
+                .sessionId(sid)
+                .put(A2aHostChatContext.class, hostCtx)
                 .build();
 
-        log.info("━━━━━━━ A2A Host 启动 ━━━━━━━ question={}", trimmed);
+        log.info("━━━━━━━ A2A Host 启动 ━━━━━━━ sessionId={}, question={}",
+                sid, trimmed);
 
-        return a2aHostAgent
+        Flux<String> agentFlux = a2aHostAgent
                 .streamEvents(new UserMessage(trimmed), ctx)
                 .mapNotNull(this::mapEventToSseChunk)
                 .doOnNext(chunk -> {
@@ -67,18 +80,50 @@ public class A2aHostServiceImpl implements IA2aHostService {
                         log.debug("[SSE] chunk={}", abbreviate(chunk));
                     }
                 })
-                .doOnComplete(() -> log.info("━━━━━━━ A2A Host 完成 ━━━━━━━"))
+                .doFinally(signal -> {
+                    hostCtx.complete();
+                    log.info("━━━━━━━ A2A Host 完成 signal={} ━━━━━━━",
+                            signal);
+                });
+
+        Flux<String> bridgeFlux = hostCtx.getSseSink().asFlux();
+        Flux<String> head = Flux.just("sessionId: " + sid + "\n");
+
+        return Flux.merge(head, agentFlux, bridgeFlux)
                 .doOnError(e -> log.error("A2A Host 异常", e))
                 .onErrorResume(e -> Flux.just("错误: " + e.getMessage()));
     }
 
     /**
+     * 按 rawInput 判定并完成挂起决策。
+     *
+     * @param request 确认请求
+     * @return 响应
+     */
+    @Override
+    public A2aHostConfirmResponse confirm(A2aHostConfirmRequest request) {
+        if (request == null
+                || request.getSessionId() == null
+                || request.getSessionId().isBlank()) {
+            return A2aHostConfirmResponse.fail("sessionId 不能为空");
+        }
+        String sid = request.getSessionId().trim();
+        boolean approved = A2aSqlConfirmTexts.isApproved(request.getRawInput());
+        log.info("[HITL] confirm sessionId={}, rawInput={}, approved={}",
+                sid, request.getRawInput(), approved);
+        boolean ok = confirmRegistry.complete(sid, approved);
+        if (!ok) {
+            return A2aHostConfirmResponse.fail("无待确认 SQL 或已过期");
+        }
+        return A2aHostConfirmResponse.ok(
+                approved ? "已批准执行" : "已取消执行");
+    }
+
+    /**
      * 将 AgentEvent 映射为 SSE 文本。
-     * <p>
-     * LLM 文本、A2A 工具开始、工具返回内容、工具结束状态都会推给前端。
      *
      * @param event AgentScope 流式事件
-     * @return SSE 文本；无关事件返回 null（由 mapNotNull 过滤）
+     * @return SSE 文本；无关事件返回 null
      */
     private String mapEventToSseChunk(AgentEvent event) {
         if (event instanceof TextBlockDeltaEvent delta) {
@@ -105,7 +150,7 @@ public class A2aHostServiceImpl implements IA2aHostService {
     }
 
     /**
-     * 日志截断，避免超长 chunk 刷屏。
+     * 日志截断。
      *
      * @param text 原始文本
      * @return 截断后文本
