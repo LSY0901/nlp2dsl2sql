@@ -350,12 +350,27 @@
     let a2aSessionId = null;
     let awaitingSqlConfirm = false;
     let sqlConfirmPanelShownFor = '';
+    /** 本轮最新待审批是否已提交（批准或拒绝），防止 SSE 续写再次弹出表单 */
+    let sqlConfirmResolved = false;
+    /** 当前 A2A Host 流式全文，供确认后清洗展示 */
+    let a2aFullText = '';
 
     function newSessionId() {
         if (window.crypto && crypto.randomUUID) {
             return crypto.randomUUID();
         }
         return 'sid-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+    }
+
+    /**
+     * 重置本轮 HITL 确认状态。
+     */
+    function resetSqlConfirmState() {
+        awaitingSqlConfirm = false;
+        sqlConfirmPanelShownFor = '';
+        sqlConfirmResolved = false;
+        a2aFullText = '';
+        userInput.placeholder = '输入你的问题...';
     }
 
     function switchMode(mode) {
@@ -372,9 +387,7 @@
                 'active', mode === 'a2aHost');
         if (mode === 'a2aHost') {
             a2aSessionId = newSessionId();
-            awaitingSqlConfirm = false;
-            sqlConfirmPanelShownFor = '';
-            userInput.placeholder = '输入你的问题...';
+            resetSqlConfirmState();
         }
         userInput.focus();
     }
@@ -417,7 +430,84 @@
     }
 
     /**
-     * 展示 SQL 确认面板（同一段待审批只展示一次）。
+     * 最新待审批之后是否已有确认结果（批准/拒绝/超时）。
+     */
+    function hasConfirmResultAfterLatestPending(fullText) {
+        const pendingIdx = fullText.lastIndexOf('[SQL确认待审批]');
+        if (pendingIdx < 0) {
+            return false;
+        }
+        const resultIdx = fullText.lastIndexOf('[SQL确认结果]');
+        return resultIdx > pendingIdx;
+    }
+
+    /**
+     * 将确认面板收成结果态，不再展示输入框；并清洗待审批原文。
+     */
+    function settleSqlConfirmPanel(bubble, message) {
+        awaitingSqlConfirm = false;
+        sqlConfirmResolved = true;
+        userInput.placeholder = '输入你的问题...';
+        let panel = bubble.querySelector('.sql-confirm-panel');
+        const display = stripPendingConfirmBlock(
+                a2aFullText || bubble.textContent || '');
+        bubble.textContent = display;
+        if (!panel) {
+            panel = document.createElement('div');
+            panel.className = 'sql-confirm-panel';
+        }
+        panel.innerHTML = '<div class="sql-confirm-title">'
+                + escapeHtml(message || '已提交')
+                + '</div>';
+        bubble.appendChild(panel);
+    }
+
+    /**
+     * 根据 SSE 全文中的确认结果推导面板文案。
+     */
+    function resolveConfirmPanelMessage(fullText) {
+        const resultIdx = fullText.lastIndexOf('[SQL确认结果]');
+        if (resultIdx < 0) {
+            return '已提交';
+        }
+        const slice = fullText.slice(resultIdx, resultIdx + 120);
+        if (slice.includes('approved=true')) {
+            return '已批准执行';
+        }
+        return '已取消执行';
+    }
+
+    /**
+     * 刷新气泡正文并保留确认面板节点。
+     * 已决策时隐藏待审批交互原文，避免再次出现「请确认」文案。
+     */
+    function refreshA2aBubbleText(bubble, fullText) {
+        const panelHtml = bubble.querySelector('.sql-confirm-panel');
+        bubble.style.whiteSpace = 'pre-wrap';
+        let display = fullText || '(无响应内容)';
+        if (sqlConfirmResolved || hasConfirmResultAfterLatestPending(fullText)) {
+            display = stripPendingConfirmBlock(display);
+        }
+        bubble.textContent = display;
+        if (panelHtml) {
+            bubble.appendChild(panelHtml);
+        }
+    }
+
+    /**
+     * 去掉已处理的「SQL确认待审批」块，避免拒绝后正文里仍像在索要确认。
+     */
+    function stripPendingConfirmBlock(text) {
+        if (!text) {
+            return text;
+        }
+        return text.replace(
+                /\n*\n========== \[SQL确认待审批\] ==========[\s\S]*?========== \[请输入 yes 或 确认\] ==========(\n\n)?/g,
+                '\n\n');
+    }
+
+    /**
+     * 展示 SQL 确认面板（同一段待审批只展示一次；已决策后不再弹出）。
      */
     function ensureSqlConfirmPanel(bubble, fullText) {
         const mark = '[SQL确认待审批]';
@@ -425,11 +515,20 @@
             return;
         }
         const key = String(fullText.lastIndexOf(mark));
+        if (hasConfirmResultAfterLatestPending(fullText)) {
+            settleSqlConfirmPanel(
+                    bubble, resolveConfirmPanelMessage(fullText));
+            return;
+        }
+        if (sqlConfirmResolved && sqlConfirmPanelShownFor === key) {
+            return;
+        }
         if (sqlConfirmPanelShownFor === key
                 && bubble.querySelector('.sql-confirm-panel')) {
             return;
         }
         sqlConfirmPanelShownFor = key;
+        sqlConfirmResolved = false;
         awaitingSqlConfirm = true;
         userInput.placeholder = '输入 yes 或 确认';
         let panel = bubble.querySelector('.sql-confirm-panel');
@@ -488,13 +587,15 @@
                 alert(data.message || ('确认失败: ' + resp.status));
                 return;
             }
-            awaitingSqlConfirm = false;
-            userInput.placeholder = '输入你的问题...';
-            const panel = document.querySelector('.sql-confirm-panel');
-            if (panel) {
-                panel.innerHTML = '<div class="sql-confirm-title">'
-                        + escapeHtml(data.message || '已提交')
-                        + '</div>';
+            const bubble = document.querySelector(
+                    '.message.ai:last-of-type .bubble');
+            if (bubble) {
+                settleSqlConfirmPanel(
+                        bubble, data.message || '已提交');
+            } else {
+                awaitingSqlConfirm = false;
+                sqlConfirmResolved = true;
+                userInput.placeholder = '输入你的问题...';
             }
         } catch (e) {
             alert('确认请求失败: ' + e.message);
@@ -623,12 +724,12 @@
         userInput.style.height = 'auto';
         if (currentMode === 'a2aHost') {
             a2aSessionId = newSessionId();
-            sqlConfirmPanelShownFor = '';
-            awaitingSqlConfirm = false;
+            resetSqlConfirmState();
         }
         addMessage('user', text);
         const bubble = addStreamingMessage();
         let fullText = '';
+        a2aFullText = '';
         try {
             const base = getApiEndpoint();
             const sep = base.includes('?') ? '&' : '?';
@@ -656,6 +757,7 @@
                         const piece = extractSseEventData(chunk);
                         if (piece) {
                             fullText += piece;
+                            a2aFullText = fullText;
                             const sidMatch = piece.match(
                                     /sessionId:\s*([^\s\n]+)/);
                             if (sidMatch && currentMode === 'a2aHost') {
@@ -665,13 +767,7 @@
                     }
                     if (currentMode === 'a2aHost'
                             && fullText.includes('[SQL确认待审批]')) {
-                        bubble.style.whiteSpace = 'pre-wrap';
-                        const panelHtml = bubble.querySelector(
-                                '.sql-confirm-panel');
-                        bubble.textContent = fullText;
-                        if (panelHtml) {
-                            bubble.appendChild(panelHtml);
-                        }
+                        refreshA2aBubbleText(bubble, fullText);
                         ensureSqlConfirmPanel(bubble, fullText);
                     } else {
                         renderAiBubble(bubble, fullText || '思考中...');
@@ -682,12 +778,12 @@
                     const piece = extractSseEventData(buffer);
                     if (piece) {
                         fullText += piece;
+                        a2aFullText = fullText;
                     }
                 }
                 if (currentMode === 'a2aHost'
                         && fullText.includes('[SQL确认待审批]')) {
-                    bubble.style.whiteSpace = 'pre-wrap';
-                    bubble.textContent = fullText || '(无响应内容)';
+                    refreshA2aBubbleText(bubble, fullText);
                     ensureSqlConfirmPanel(bubble, fullText);
                 } else {
                     renderAiBubble(bubble, fullText || '(无响应内容)');

@@ -24,13 +24,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * A2A Host 本地 SQL HITL 执行器：streamEvents + Permission 确认 + 恢复。
+ * <p>
+ * 用户拒绝后：应用 ConfirmResult(false)、自动拒绝后续 ASK，不再弹出确认 UI，
+ * 并立即结束本子查询。
  */
 @Slf4j
 @Component
 public class A2aSqlHitlRunner {
+
+    /** 拒绝后自动排空后续 ASK 的最大次数，防止死循环 */
+    private static final int MAX_AUTO_DENY_DEPTH = 3;
 
     private final SqlQueryHitlAgentFactory hitlFactory;
     private final A2aSqlConfirmRegistry confirmRegistry;
@@ -66,15 +73,29 @@ public class A2aSqlHitlRunner {
 
         StringBuilder finalText = new StringBuilder();
         Duration phaseTimeout = Duration.ofMillis(Math.max(timeoutMs, 60_000L));
+        AtomicBoolean userDenied = new AtomicBoolean(false);
 
         try {
             for (AgentEvent event : agent
                     .streamEvents(new UserMessage(query.trim()), sqlCtx)
                     .toIterable()) {
                 if (event instanceof RequireUserConfirmEvent confirm) {
-                    resumeAfterConfirm(
+                    if (userDenied.get()) {
+                        autoDenyAsking(
+                                confirm.getToolCalls(), agent, sqlCtx,
+                                phaseTimeout);
+                        continue;
+                    }
+                    boolean approved = resumeAfterConfirm(
                             confirm, hostCtx, agent, sqlCtx,
                             finalText, phaseTimeout, 0);
+                    if (!approved) {
+                        userDenied.set(true);
+                        break;
+                    }
+                    continue;
+                }
+                if (userDenied.get()) {
                     continue;
                 }
                 appendAndEmit(event, hostCtx, finalText);
@@ -94,8 +115,9 @@ public class A2aSqlHitlRunner {
      * 处理 Permission ASK：推送 SQL、等待确认、ConfirmResult 恢复。
      *
      * @param depth 嵌套确认深度，防止死循环
+     * @return 用户是否批准；拒绝则 false
      */
-    private void resumeAfterConfirm(
+    private boolean resumeAfterConfirm(
             RequireUserConfirmEvent confirm,
             A2aHostChatContext hostCtx,
             ReActAgent agent,
@@ -106,12 +128,15 @@ public class A2aSqlHitlRunner {
         if (depth >= 3) {
             hostCtx.emit(A2aSqlConfirmTexts.formatResult(
                     false, "确认次数超限"));
-            return;
+            finishDenied(
+                    agent, sqlCtx, confirm.getToolCalls(),
+                    phaseTimeout, hostCtx, finalText);
+            return false;
         }
         List<ToolUseBlock> toolCalls = confirm.getToolCalls();
         if (toolCalls == null || toolCalls.isEmpty()) {
             hostCtx.emit(A2aSqlConfirmTexts.formatResult(false, "无待确认工具"));
-            return;
+            return false;
         }
 
         String sql = extractSql(toolCalls);
@@ -126,11 +151,18 @@ public class A2aSqlHitlRunner {
         boolean approved = waitDecision(pending, hostCtx);
         confirmRegistry.remove(hostCtx.getSessionId());
 
-        Msg resumeMsg = buildResumeMsg(approved, toolCalls);
+        if (!approved) {
+            finishDenied(
+                    agent, sqlCtx, toolCalls,
+                    phaseTimeout, hostCtx, finalText);
+            return false;
+        }
+
+        Msg resumeMsg = buildResumeMsg(true, toolCalls);
         try {
             Msg result = agent.call(List.of(resumeMsg), sqlCtx)
                     .block(phaseTimeout);
-            handleResumeResult(
+            return handleApprovedResumeResult(
                     result, hostCtx, agent, sqlCtx,
                     finalText, phaseTimeout, depth);
         } catch (Exception e) {
@@ -138,6 +170,66 @@ public class A2aSqlHitlRunner {
             String err = "SQL 确认后恢复失败: " + e.getMessage();
             hostCtx.emit(err);
             finalText.append(err);
+            return true;
+        }
+    }
+
+    /**
+     * 用户拒绝：应用 ConfirmResult(false)，自动拒绝后续 ASK，结束子查询。
+     */
+    private void finishDenied(
+            ReActAgent agent,
+            RuntimeContext sqlCtx,
+            List<ToolUseBlock> toolCalls,
+            Duration phaseTimeout,
+            A2aHostChatContext hostCtx,
+            StringBuilder finalText) {
+        try {
+            Msg result = agent.call(
+                    List.of(buildResumeMsg(false, toolCalls)), sqlCtx)
+                    .block(phaseTimeout);
+            int depth = 0;
+            while (result != null
+                    && result.getGenerateReason()
+                    == GenerateReason.PERMISSION_ASKING
+                    && depth < MAX_AUTO_DENY_DEPTH) {
+                List<ToolUseBlock> asking = result.getContentBlocks(
+                        ToolUseBlock.class);
+                if (asking == null || asking.isEmpty()) {
+                    break;
+                }
+                log.info("[HITL] 拒绝后自动拒绝后续 ASK depth={} sessionId={}",
+                        depth, hostCtx.getSessionId());
+                result = agent.call(
+                        List.of(buildResumeMsg(false, asking)), sqlCtx)
+                        .block(phaseTimeout);
+                depth++;
+            }
+        } catch (Exception e) {
+            log.warn("[HITL] 拒绝后恢复/排空失败: {}", e.getMessage());
+        }
+        String cancel = A2aSqlConfirmTexts.cancelledByUser();
+        hostCtx.emit(cancel);
+        finalText.setLength(0);
+        finalText.append(cancel);
+    }
+
+    /**
+     * 用户已拒绝后，对流中再次出现的 ASK 静默拒绝（不弹 UI）。
+     */
+    private void autoDenyAsking(
+            List<ToolUseBlock> toolCalls,
+            ReActAgent agent,
+            RuntimeContext sqlCtx,
+            Duration phaseTimeout) {
+        if (toolCalls == null || toolCalls.isEmpty()) {
+            return;
+        }
+        try {
+            agent.call(List.of(buildResumeMsg(false, toolCalls)), sqlCtx)
+                    .block(phaseTimeout);
+        } catch (Exception e) {
+            log.warn("[HITL] 静默拒绝后续 ASK 失败: {}", e.getMessage());
         }
     }
 
@@ -165,9 +257,11 @@ public class A2aSqlHitlRunner {
     }
 
     /**
-     * 处理恢复结果；若再次 ASKING 则继续确认（最多 3 次）。
+     * 处理批准后的恢复结果；若再次 ASKING 则继续向用户确认（最多 3 次）。
+     *
+     * @return 嵌套确认是否仍为批准；用户拒绝则为 false
      */
-    private void handleResumeResult(
+    private boolean handleApprovedResumeResult(
             Msg result,
             A2aHostChatContext hostCtx,
             ReActAgent agent,
@@ -176,7 +270,7 @@ public class A2aSqlHitlRunner {
             Duration phaseTimeout,
             int depth) {
         if (result == null) {
-            return;
+            return true;
         }
         if (result.getGenerateReason() == GenerateReason.PERMISSION_ASKING
                 && depth < 3) {
@@ -188,10 +282,9 @@ public class A2aSqlHitlRunner {
                                 result.getId() != null
                                         ? result.getId() : "resume",
                                 asking);
-                resumeAfterConfirm(
+                return resumeAfterConfirm(
                         again, hostCtx, agent, sqlCtx,
                         finalText, phaseTimeout, depth + 1);
-                return;
             }
         }
         String text = A2aMsgTexts.extract(result);
@@ -199,6 +292,7 @@ public class A2aSqlHitlRunner {
             hostCtx.emit(text);
             finalText.append(text);
         }
+        return true;
     }
 
     /**

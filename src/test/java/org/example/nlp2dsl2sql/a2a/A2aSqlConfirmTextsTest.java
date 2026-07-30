@@ -36,4 +36,15 @@ class A2aSqlConfirmTextsTest {
         assertTrue(text.contains("SELECT 1"));
         assertTrue(text.contains("[请输入 yes 或 确认]"));
     }
+
+    /**
+     * 拒绝后取消文案固定，且不得再含待审批标记。
+     */
+    @Test
+    void cancelledByUserMessageHasNoPendingMarker() {
+        String text = A2aSqlConfirmTexts.cancelledByUser();
+        assertTrue(text.contains("已取消") || text.contains("拒绝"));
+        assertFalse(text.contains(A2aSqlConfirmTexts.MARK_PENDING));
+        assertFalse(text.contains(A2aSqlConfirmTexts.MARK_PROMPT));
+    }
 }

@@ -62,6 +62,15 @@ public final class A2aSqlConfirmTexts {
     }
 
     /**
+     * 用户拒绝后返回给 Host 的固定取消说明（不再继续 HITL）。
+     *
+     * @return 取消文案
+     */
+    public static String cancelledByUser() {
+        return "用户已拒绝执行 SQL，本子查询已取消。";
+    }
+
+    /**
      * null 转空串。
      *
      * @param s 原串
