@@ -15,7 +15,7 @@ agentscope:
   openai:
     api-key: sk-XXXX
     base-url: https://api.deepseek.com
-    model-name: deepseek-v4-pro
+    model-name: deepseek-v4-flash
   a2a:
     server:
       enabled: true

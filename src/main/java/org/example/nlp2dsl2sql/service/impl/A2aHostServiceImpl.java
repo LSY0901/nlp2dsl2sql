@@ -65,7 +65,7 @@ public class A2aHostServiceImpl implements IA2aHostService {
 
         RuntimeContext ctx = RuntimeContext.builder()
                 .userId("lsy")
-                .sessionId(sid)
+                .sessionId("0901")
                 .put(A2aHostChatContext.class, hostCtx)
                 .build();
 

@@ -44,6 +44,12 @@
             <version>${agentscope.version}</version>
         </dependency>
 
+        <!-- AgentScope A2A（含 client + server 自动配置） -->
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-a2a-spring-boot-starter</artifactId>
+            <version>${agentscope.version}</version>
+        </dependency>
         <!-- Spring Boot Web -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -89,12 +95,7 @@
             <version>2.0.40</version>
         </dependency>
 
-        <!-- AgentScope A2A（含 client + server 自动配置） -->
-        <dependency>
-            <groupId>io.agentscope</groupId>
-            <artifactId>agentscope-a2a-spring-boot-starter</artifactId>
-            <version>${agentscope.version}</version>
-        </dependency>
+
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
