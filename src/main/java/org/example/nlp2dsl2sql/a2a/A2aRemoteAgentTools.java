@@ -6,6 +6,7 @@ import io.agentscope.core.message.UserMessage;
 import io.agentscope.core.tool.Tool;
 import io.agentscope.core.tool.ToolParam;
 import lombok.extern.slf4j.Slf4j;
+import org.example.nlp2dsl2sql.a2a.trace.HostTraceRecorder;
 import org.example.nlp2dsl2sql.config.A2aClientProperties;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
@@ -26,22 +27,26 @@ public class A2aRemoteAgentTools {
     private final A2aAgent sopAgent;
     private final A2aClientProperties clientProperties;
     private final A2aSqlHitlRunner sqlHitlRunner;
+    private final HostTraceRecorder traceRecorder;
 
     /**
      * @param sqlAgent         本机 SQL A2A 客户端（兜底）
      * @param sopAgent         远端 SOP A2A 客户端
      * @param clientProperties A2A 超时等连接配置
      * @param sqlHitlRunner    Host SQL HITL 执行器
+     * @param traceRecorder    trace 内存记录器
      */
     public A2aRemoteAgentTools(
             @Qualifier("sqlQueryA2aAgent") A2aAgent sqlAgent,
             @Qualifier("sopDocA2aAgent") A2aAgent sopAgent,
             A2aClientProperties clientProperties,
-            A2aSqlHitlRunner sqlHitlRunner) {
+            A2aSqlHitlRunner sqlHitlRunner,
+            HostTraceRecorder traceRecorder) {
         this.sqlAgent = sqlAgent;
         this.sopAgent = sopAgent;
         this.clientProperties = clientProperties;
         this.sqlHitlRunner = sqlHitlRunner;
+        this.traceRecorder = traceRecorder;
     }
 
     /**
@@ -66,6 +71,8 @@ public class A2aRemoteAgentTools {
         if (hostCtx != null) {
             log.info("[HITL] 本地 SQL Agent, sessionId={}, query={}",
                     hostCtx.getSessionId(), query);
+            traceRecorder.step(hostCtx.getSessionId(),
+                    "call_sql_agent", query.trim());
             return sqlHitlRunner.run(query.trim(), hostCtx, timeoutMs);
         }
         return callRemote("SQL", sqlAgent, query, timeoutMs);
@@ -83,7 +90,12 @@ public class A2aRemoteAgentTools {
             此类问题必须调用本工具，禁止 Host 自行回答。
             """)
     public String callSopAgent(
-            @ToolParam(name = "query", description = "子问题原文") String query) {
+            @ToolParam(name = "query", description = "子问题原文") String query,
+            A2aHostChatContext hostCtx) {
+        if (hostCtx != null) {
+            traceRecorder.step(hostCtx.getSessionId(),
+                    "call_sop_agent", query);
+        }
         long timeoutMs = clientProperties.getSopAgent().getTimeoutMs();
         return callRemote("SOP", sopAgent, query, timeoutMs);
     }

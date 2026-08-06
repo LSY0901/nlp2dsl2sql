@@ -1,8 +1,11 @@
 package org.example.nlp2dsl2sql.service;
 
+import org.example.nlp2dsl2sql.a2a.trace.HostTraceRecord;
 import org.example.nlp2dsl2sql.models.vo.A2aHostConfirmRequest;
 import org.example.nlp2dsl2sql.models.vo.A2aHostConfirmResponse;
 import reactor.core.publisher.Flux;
+
+import java.util.List;
 
 /**
  * A2A Host 流式编排服务。
@@ -25,4 +28,19 @@ public interface IA2aHostService {
      * @return 确认结果
      */
     A2aHostConfirmResponse confirm(A2aHostConfirmRequest request);
+
+    /**
+     * 最近 trace 列表（按开始时间倒序）。
+     *
+     * @return trace 列表
+     */
+    List<HostTraceRecord> listTraces();
+
+    /**
+     * 单条 trace 详情。
+     *
+     * @param sessionId 会话 ID
+     * @return trace；不存在返回 null
+     */
+    HostTraceRecord getTrace(String sessionId);
 }

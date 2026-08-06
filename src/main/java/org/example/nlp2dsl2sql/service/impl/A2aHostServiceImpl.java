@@ -15,12 +15,16 @@ import org.example.nlp2dsl2sql.a2a.A2aHostChatContext;
 import org.example.nlp2dsl2sql.a2a.A2aHostModelRouter;
 import org.example.nlp2dsl2sql.a2a.A2aSqlConfirmRegistry;
 import org.example.nlp2dsl2sql.a2a.A2aSqlConfirmTexts;
+import org.example.nlp2dsl2sql.a2a.trace.HostTraceRecord;
+import org.example.nlp2dsl2sql.a2a.trace.HostTraceRecorder;
 import org.example.nlp2dsl2sql.models.vo.A2aHostConfirmRequest;
 import org.example.nlp2dsl2sql.models.vo.A2aHostConfirmResponse;
 import org.example.nlp2dsl2sql.service.IA2aHostService;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.SignalType;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -35,6 +39,7 @@ public class A2aHostServiceImpl implements IA2aHostService {
     private final A2aHostAgentFactory hostAgentFactory;
     private final A2aHostModelRouter modelRouter;
     private final A2aSqlConfirmRegistry confirmRegistry;
+    private final HostTraceRecorder traceRecorder;
 
     /**
      * 构造 A2A Host 服务。
@@ -42,14 +47,17 @@ public class A2aHostServiceImpl implements IA2aHostService {
      * @param hostAgentFactory Host Agent 工厂
      * @param modelRouter      模型路由器
      * @param confirmRegistry  SQL 确认挂起表
+     * @param traceRecorder    trace 内存记录器
      */
     public A2aHostServiceImpl(
             A2aHostAgentFactory hostAgentFactory,
             A2aHostModelRouter modelRouter,
-            A2aSqlConfirmRegistry confirmRegistry) {
+            A2aSqlConfirmRegistry confirmRegistry,
+            HostTraceRecorder traceRecorder) {
         this.hostAgentFactory = hostAgentFactory;
         this.modelRouter = modelRouter;
         this.confirmRegistry = confirmRegistry;
+        this.traceRecorder = traceRecorder;
     }
 
     /**
@@ -70,8 +78,11 @@ public class A2aHostServiceImpl implements IA2aHostService {
                 ? UUID.randomUUID().toString()
                 : sessionId.trim();
         A2aHostChatContext hostCtx = new A2aHostChatContext(sid);
+        traceRecorder.start(sid, trimmed);
 
-        OpenAIChatModel model = modelRouter.resolve(trimmed);
+        A2aHostModelRouter.ModelRoute route = modelRouter.route(trimmed);
+        OpenAIChatModel model = route.model();
+        traceRecorder.recordModel(sid, route.tier(), model.getModelName());
         HarnessAgent hostAgent = hostAgentFactory.create(model);
 
         RuntimeContext ctx = RuntimeContext.builder()
@@ -80,8 +91,8 @@ public class A2aHostServiceImpl implements IA2aHostService {
                 .put(A2aHostChatContext.class, hostCtx)
                 .build();
 
-        log.info("━━━━━━━ A2A Host 启动 ━━━━━━━ sessionId={}, model={}, question={}",
-                sid, model.getModelName(), trimmed);
+        log.info("━━━━━━━ A2A Host 启动 ━━━━━━━ sessionId={}, tier={}, model={}, question={}",
+                sid, route.tier(), model.getModelName(), trimmed);
 
         Flux<String> agentFlux = hostAgent
                 .streamEvents(new UserMessage(trimmed), ctx)
@@ -100,10 +111,25 @@ public class A2aHostServiceImpl implements IA2aHostService {
         Flux<String> bridgeFlux = hostCtx.getSseSink().asFlux();
         Flux<String> head = Flux.just(
                 "sessionId: " + sid + "\n",
+                "tier: " + route.tier() + "\n",
                 "model: " + model.getModelName() + "\n");
 
         return Flux.merge(head, agentFlux, bridgeFlux)
-                .doOnError(e -> log.error("A2A Host 异常", e))
+                .doOnError(e -> {
+                    log.error("A2A Host 异常", e);
+                    traceRecorder.fail(sid,
+                            HostTraceRecord.STATUS_FAILED, e.getMessage());
+                })
+                .doFinally(signal -> {
+                    if (signal == SignalType.ON_COMPLETE) {
+                        traceRecorder.finish(sid,
+                                HostTraceRecord.STATUS_COMPLETED);
+                    } else if (signal != SignalType.ON_ERROR) {
+                        traceRecorder.fail(sid,
+                                HostTraceRecord.STATUS_CANCELLED,
+                                "signal=" + signal);
+                    }
+                })
                 .onErrorResume(e -> Flux.just("错误: " + e.getMessage()));
     }
 
@@ -130,6 +156,27 @@ public class A2aHostServiceImpl implements IA2aHostService {
         }
         return A2aHostConfirmResponse.ok(
                 approved ? "已批准执行" : "已取消执行");
+    }
+
+    /**
+     * 最近 trace 列表（按开始时间倒序）。
+     *
+     * @return trace 列表
+     */
+    @Override
+    public List<HostTraceRecord> listTraces() {
+        return traceRecorder.listRecent();
+    }
+
+    /**
+     * 单条 trace 详情。
+     *
+     * @param sessionId 会话 ID
+     * @return trace；不存在返回 null
+     */
+    @Override
+    public HostTraceRecord getTrace(String sessionId) {
+        return traceRecorder.get(sessionId);
     }
 
     /**

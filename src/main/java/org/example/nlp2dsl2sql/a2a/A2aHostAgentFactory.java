@@ -1,9 +1,11 @@
 package org.example.nlp2dsl2sql.a2a;
 
+import io.agentscope.core.hook.recorder.JsonlTraceExporter;
 import io.agentscope.core.tool.Toolkit;
 import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import io.agentscope.harness.agent.HarnessAgent;
 import io.agentscope.harness.agent.memory.compaction.CompactionConfig;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Paths;
@@ -17,12 +19,17 @@ import java.nio.file.Paths;
 public class A2aHostAgentFactory {
 
     private final A2aRemoteAgentTools tools;
+    private final ObjectProvider<JsonlTraceExporter> traceExporter;
 
     /**
-     * @param tools A2A 远程 Agent 工具
+     * @param tools         A2A 远程 Agent 工具
+     * @param traceExporter JSONL trace 导出器（trace 关闭时不存在）
      */
-    public A2aHostAgentFactory(A2aRemoteAgentTools tools) {
+    public A2aHostAgentFactory(
+            A2aRemoteAgentTools tools,
+            ObjectProvider<JsonlTraceExporter> traceExporter) {
         this.tools = tools;
+        this.traceExporter = traceExporter;
     }
 
     /**
@@ -35,7 +42,7 @@ public class A2aHostAgentFactory {
         Toolkit toolkit = new Toolkit();
         toolkit.registerTool(tools);
 
-        return HarnessAgent.builder()
+        HarnessAgent.Builder builder = HarnessAgent.builder()
                 .name("a2aHostAgent")
                 .sysPrompt(A2aHostPrompt.SYSTEM)
                 .model(model)
@@ -52,7 +59,12 @@ public class A2aHostAgentFactory {
                 .compaction(CompactionConfig.builder()
                         .triggerMessages(30)
                         .keepMessages(10)
-                        .build())
-                .build();
+                        .build());
+
+        JsonlTraceExporter exporter = traceExporter.getIfAvailable();
+        if (exporter != null) {
+            builder.hook(exporter);
+        }
+        return builder.build();
     }
 }

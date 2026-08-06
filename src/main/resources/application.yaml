@@ -47,6 +47,11 @@ a2a:
         simple-keywords: [平均分, 最高分, 最低分, 是多少, 有多少, 数量, 总数]
         complex-keywords: [对比, 比较, 分别, 各年级, 各个, 同比, 环比, 明细, 列出, 以及, 并且, 同时]
         length-threshold: 60
+    trace:
+      enabled: true
+      jsonl-file: .agentscope/traces/a2a-host.jsonl
+      max-records: 200
+      ttl-ms: 3600000
 
 embedding:
   base-url: http://localhost:8082

@@ -1,6 +1,7 @@
 package org.example.nlp2dsl2sql.a2a;
 
 import io.agentscope.core.ReActAgent;
+import io.agentscope.core.hook.recorder.JsonlTraceExporter;
 import io.agentscope.core.permission.PermissionBehavior;
 import io.agentscope.core.permission.PermissionContextState;
 import io.agentscope.core.permission.PermissionMode;
@@ -9,6 +10,7 @@ import io.agentscope.core.tool.Toolkit;
 import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import org.example.nlp2dsl2sql.agent.Nlp2dsl2sqlAgent;
 import org.example.nlp2dsl2sql.tools.AgentToolRegistry;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 /**
@@ -32,16 +34,20 @@ public class SqlQueryHitlAgentFactory {
 
     private final OpenAIChatModel model;
     private final AgentToolRegistry toolRegistry;
+    private final ObjectProvider<JsonlTraceExporter> traceExporter;
 
     /**
-     * @param model        LLM
-     * @param toolRegistry 问数工具集
+     * @param model         LLM
+     * @param toolRegistry  问数工具集
+     * @param traceExporter JSONL trace 导出器（trace 关闭时不存在）
      */
     public SqlQueryHitlAgentFactory(
             OpenAIChatModel model,
-            AgentToolRegistry toolRegistry) {
+            AgentToolRegistry toolRegistry,
+            ObjectProvider<JsonlTraceExporter> traceExporter) {
         this.model = model;
         this.toolRegistry = toolRegistry;
+        this.traceExporter = traceExporter;
     }
 
     /**
@@ -62,13 +68,18 @@ public class SqlQueryHitlAgentFactory {
         Toolkit toolkit = new Toolkit();
         toolkit.registerTool(toolRegistry);
 
-        return ReActAgent.builder()
+        ReActAgent.Builder builder = ReActAgent.builder()
                 .name("sql-query-hitl-agent")
                 .sysPrompt(Nlp2dsl2sqlAgent.SUPERVISOR_PROMPT)
                 .model(model)
                 .toolkit(toolkit)
                 .permissionContext(perm.build())
-                .maxIters(15)
-                .build();
+                .maxIters(15);
+
+        JsonlTraceExporter exporter = traceExporter.getIfAvailable();
+        if (exporter != null) {
+            builder.hook(exporter);
+        }
+        return builder.build();
     }
 }

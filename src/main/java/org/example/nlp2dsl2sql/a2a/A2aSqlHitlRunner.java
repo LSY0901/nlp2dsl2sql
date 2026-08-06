@@ -15,6 +15,7 @@ import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.message.ToolUseBlock;
 import io.agentscope.core.message.UserMessage;
 import lombok.extern.slf4j.Slf4j;
+import org.example.nlp2dsl2sql.a2a.trace.HostTraceRecorder;
 import org.example.nlp2dsl2sql.models.dto.dsl.AgentSessionContext;
 import org.springframework.stereotype.Component;
 
@@ -41,16 +42,20 @@ public class A2aSqlHitlRunner {
 
     private final SqlQueryHitlAgentFactory hitlFactory;
     private final A2aSqlConfirmRegistry confirmRegistry;
+    private final HostTraceRecorder traceRecorder;
 
     /**
-     * @param hitlFactory      HITL Agent 工厂
-     * @param confirmRegistry  挂起表
+     * @param hitlFactory     HITL Agent 工厂
+     * @param confirmRegistry 挂起表
+     * @param traceRecorder   trace 内存记录器
      */
     public A2aSqlHitlRunner(
             SqlQueryHitlAgentFactory hitlFactory,
-            A2aSqlConfirmRegistry confirmRegistry) {
+            A2aSqlConfirmRegistry confirmRegistry,
+            HostTraceRecorder traceRecorder) {
         this.hitlFactory = hitlFactory;
         this.confirmRegistry = confirmRegistry;
+        this.traceRecorder = traceRecorder;
     }
 
     /**
@@ -141,6 +146,7 @@ public class A2aSqlHitlRunner {
 
         String sql = extractSql(toolCalls);
         String toolCallId = toolCalls.get(0).getId();
+        traceRecorder.sql(hostCtx.getSessionId(), sql);
         hostCtx.emit(A2aSqlConfirmTexts.formatPending(
                 hostCtx.getSessionId(), toolCallId, sql));
 
@@ -241,15 +247,19 @@ public class A2aSqlHitlRunner {
         try {
             boolean approved = pending.getDecision().get(
                     A2aSqlConfirmRegistry.TIMEOUT_MS, TimeUnit.MILLISECONDS);
+            traceRecorder.hitl(hostCtx.getSessionId(), approved,
+                    approved ? null : "user denied");
             hostCtx.emit(A2aSqlConfirmTexts.formatResult(
                     approved, approved ? null : "user denied"));
             return approved;
         } catch (TimeoutException e) {
             pending.getDecision().complete(false);
+            traceRecorder.hitl(hostCtx.getSessionId(), false, "timeout");
             hostCtx.emit(A2aSqlConfirmTexts.formatResult(false, "timeout"));
             return false;
         } catch (Exception e) {
             pending.getDecision().complete(false);
+            traceRecorder.hitl(hostCtx.getSessionId(), false, e.getMessage());
             hostCtx.emit(A2aSqlConfirmTexts.formatResult(
                     false, e.getMessage()));
             return false;

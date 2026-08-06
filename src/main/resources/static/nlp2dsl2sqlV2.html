@@ -303,6 +303,176 @@
             cursor: pointer;
             font-weight: 600;
         }
+
+        .trace-btn {
+            border: 1px solid #e5e5e5;
+            background: #fff;
+            color: #4f46e5;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 5px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .trace-btn:hover { background: #eef2ff; }
+
+        .trace-panel {
+            position: fixed;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 380px;
+            max-width: 90vw;
+            background: #fff;
+            border-left: 1px solid #e5e5e5;
+            box-shadow: -4px 0 16px rgba(0, 0, 0, 0.08);
+            transform: translateX(100%);
+            transition: transform 0.25s ease;
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .trace-panel.open { transform: translateX(0); }
+
+        .trace-panel-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            border-bottom: 1px solid #e5e5e5;
+            font-weight: 600;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .trace-panel-head .trace-close {
+            border: none;
+            background: transparent;
+            color: #6b7280;
+            font-size: 18px;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .trace-body { flex: 1; overflow-y: auto; padding: 12px 16px; }
+
+        .trace-list { display: flex; flex-direction: column; gap: 8px; }
+
+        .trace-item {
+            border: 1px solid #e5e5e5;
+            border-radius: 10px;
+            padding: 10px 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .trace-item:hover { background: #f9fafb; }
+
+        .trace-item-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .trace-status {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 1px 8px;
+            border-radius: 999px;
+        }
+
+        .trace-status.COMPLETED { background: #dcfce7; color: #166534; }
+        .trace-status.RUNNING { background: #dbeafe; color: #1e40af; }
+        .trace-status.FAILED { background: #fee2e2; color: #991b1b; }
+        .trace-status.CANCELLED { background: #f3f4f6; color: #6b7280; }
+
+        .trace-model {
+            font-size: 12px;
+            color: #4f46e5;
+            font-weight: 600;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+        }
+
+        .trace-time { font-size: 11px; color: #9ca3af; flex-shrink: 0; }
+
+        .trace-question {
+            font-size: 13px;
+            color: #111827;
+            margin-bottom: 4px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .trace-meta {
+            font-size: 11px;
+            color: #6b7280;
+            line-height: 1.6;
+        }
+
+        .trace-empty {
+            text-align: center;
+            color: #9ca3af;
+            font-size: 13px;
+            padding: 24px 0;
+        }
+
+        .trace-detail-head {
+            margin-bottom: 12px;
+            font-size: 14px;
+            color: #111827;
+            font-weight: 600;
+            word-break: break-word;
+        }
+
+        .trace-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #6b7280;
+            letter-spacing: 0.04em;
+            margin: 12px 0 6px;
+        }
+
+        .trace-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .trace-step {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            font-size: 13px;
+            padding: 6px 10px;
+            background: #f9fafb;
+            border-radius: 8px;
+        }
+
+        .trace-step-name {
+            font-weight: 600;
+            color: #111827;
+            flex-shrink: 0;
+        }
+
+        .trace-step-detail {
+            color: #374151;
+            flex: 1;
+            word-break: break-word;
+        }
+
+        .trace-step-time {
+            color: #9ca3af;
+            font-size: 11px;
+            flex-shrink: 0;
+        }
     </style>
 </head>
 <body>
@@ -321,7 +491,22 @@
         <button class="mode-btn" id="modeA2aHost"
                 onclick="switchMode('a2aHost')">A2A Host</button>
     </div>
+    <button class="trace-btn" id="traceToggleBtn" onclick="toggleTracePanel()">
+        Trace
+    </button>
 </header>
+
+<div class="trace-panel" id="tracePanel">
+    <div class="trace-panel-head">
+        <span>A2A Host 模型路由 Trace</span>
+        <button class="trace-close" onclick="toggleTracePanel()"
+                title="关闭">&times;</button>
+    </div>
+    <div class="trace-body">
+        <div id="traceList" class="trace-list"></div>
+        <div id="traceDetail" class="trace-detail"></div>
+    </div>
+</div>
 
 <div class="chat-container" id="chatContainer">
     <div class="welcome">
@@ -363,6 +548,132 @@
     }
 
     /**
+     * 当前 A2A Host 路由到的模型名（SSE 首部解析）。
+     */
+    let a2aModelName = '';
+    /**
+     * 当前 A2A Host 复杂度档位（SSE 首部解析）。
+     */
+    let a2aTier = '';
+
+    /**
+     * 开合 Trace 面板。
+     */
+    function toggleTracePanel() {
+        const panel = document.getElementById('tracePanel');
+        const open = panel.classList.toggle('open');
+        if (open) {
+            loadTraceList();
+        }
+    }
+
+    /**
+     * 加载最近 trace 列表并渲染。
+     */
+    async function loadTraceList() {
+        const box = document.getElementById('traceList');
+        const detail = document.getElementById('traceDetail');
+        detail.innerHTML = '';
+        try {
+            const resp = await fetch(`${API_BASE_URL}/aiChat/a2aHost/traces`);
+            const list = await resp.json();
+            if (!Array.isArray(list) || list.length === 0) {
+                box.innerHTML = '<div class="trace-empty">暂无 trace 记录</div>';
+                return;
+            }
+            box.innerHTML = list.map(renderTraceItem).join('');
+        } catch (e) {
+            box.innerHTML = '<div class="trace-empty">加载失败: '
+                    + escapeHtml(e.message) + '</div>';
+        }
+    }
+
+    /**
+     * 渲染单条 trace 列表项（点击加载详情）。
+     */
+    function renderTraceItem(t) {
+        const d = new Date(t.startTimeMs);
+        const time = d.toLocaleTimeString();
+        const hitl = t.hitlApproved == null ? '' :
+                ' · HITL=' + (t.hitlApproved ? '批准' : '拒绝');
+        return '<div class="trace-item" onclick="loadTraceDetail('
+                + `'${encodeURIComponent(t.sessionId)}')" title="点击查看详情">`
+                + '<div class="trace-item-head">'
+                + `<span class="trace-status ${escapeHtml(t.status)}">${escapeHtml(t.status)}</span>`
+                + `<span class="trace-model">${escapeHtml(t.modelName || '')}</span>`
+                + `<span class="trace-time">${time}</span>`
+                + '</div>'
+                + `<div class="trace-question">${escapeHtml(t.question || '')}</div>`
+                + '<div class="trace-meta">tier='
+                + `${escapeHtml(t.tier || '')} · ${formatDuration(t.durationMs)}${hitl}</div>`
+                + '</div>';
+    }
+
+    /**
+     * 加载单条 trace 详情并渲染。
+     */
+    async function loadTraceDetail(encodedSessionId) {
+        const sessionId = decodeURIComponent(encodedSessionId);
+        const box = document.getElementById('traceDetail');
+        try {
+            const resp = await fetch(
+                    `${API_BASE_URL}/aiChat/a2aHost/traces/${encodedSessionId}`);
+            const t = await resp.json();
+            if (!t || !t.sessionId) {
+                box.innerHTML = '<div class="trace-empty">未找到该 trace</div>';
+                return;
+            }
+            box.innerHTML = renderTraceDetail(t);
+        } catch (e) {
+            box.innerHTML = '<div class="trace-empty">加载失败: '
+                    + escapeHtml(e.message) + '</div>';
+        }
+    }
+
+    /**
+     * 渲染 trace 详情。
+     */
+    function renderTraceDetail(t) {
+        const d = new Date(t.startTimeMs);
+        const hitl = t.hitlApproved == null ? '' :
+                ' · HITL=' + (t.hitlApproved ? '已批准' : '已拒绝');
+        const steps = (t.steps || []).map(s => {
+            const rel = Math.max(0, s.timeMs - t.startTimeMs);
+            return '<div class="trace-step">'
+                    + `<span class="trace-step-name">${escapeHtml(s.name)}</span>`
+                    + `<span class="trace-step-detail">${escapeHtml(s.detail || '')}</span>`
+                    + `<span class="trace-step-time">+${(rel / 1000).toFixed(1)}s</span>`
+                    + '</div>';
+        }).join('');
+        return '<div class="trace-detail-head">'
+                + `<div>${escapeHtml(t.question || '')}</div>`
+                + '<div class="trace-meta">'
+                + `sessionId: ${escapeHtml(t.sessionId)}</div>`
+                + '<div class="trace-meta">tier='
+                + `${escapeHtml(t.tier || '')} · model=${escapeHtml(t.modelName || '')}`
+                + ` · ${escapeHtml(t.status)} · ${formatDuration(t.durationMs)}`
+                + ` · ${d.toLocaleString()}${hitl}</div>`
+                + '</div>'
+                + (t.error ? `<div class="trace-label">错误</div><div class="error-text">${escapeHtml(t.error)}</div>` : '')
+                + (t.sql ? `<div class="trace-label">SQL</div><pre class="answer-sql">${escapeHtml(t.sql)}</pre>` : '')
+                + (steps ? `<div class="trace-label">步骤时间线</div><div class="trace-steps">${steps}</div>` : '')
+                + `<div class="trace-label">JSONL 落盘</div><div class="trace-meta">.agentscope/traces/a2a-host.jsonl</div>`;
+    }
+
+    /**
+     * 毫秒转可读时长。
+     */
+    function formatDuration(ms) {
+        if (ms == null) {
+            return '-';
+        }
+        if (ms < 1000) {
+            return ms + 'ms';
+        }
+        return (ms / 1000).toFixed(1) + 's';
+    }
+
+    /**
      * 重置本轮 HITL 确认状态。
      */
     function resetSqlConfirmState() {
@@ -387,6 +698,8 @@
                 'active', mode === 'a2aHost');
         if (mode === 'a2aHost') {
             a2aSessionId = newSessionId();
+            a2aModelName = '';
+            a2aTier = '';
             resetSqlConfirmState();
         }
         userInput.focus();
@@ -763,6 +1076,16 @@
                             if (sidMatch && currentMode === 'a2aHost') {
                                 a2aSessionId = sidMatch[1].trim();
                             }
+                            const modelMatch = piece.match(
+                                    /model:\s*([^\s\n]+)/);
+                            if (modelMatch && currentMode === 'a2aHost') {
+                                a2aModelName = modelMatch[1].trim();
+                            }
+                            const tierMatch = piece.match(
+                                    /tier:\s*([^\s\n]+)/);
+                            if (tierMatch && currentMode === 'a2aHost') {
+                                a2aTier = tierMatch[1].trim();
+                            }
                         }
                     }
                     if (currentMode === 'a2aHost'
@@ -799,6 +1122,32 @@
             isStreaming = false;
             sendBtn.disabled = false;
             userInput.focus();
+            if (currentMode === 'a2aHost') {
+                refreshCurrentTrace();
+            }
+        }
+    }
+
+    /**
+     * 流结束后刷新当前会话 trace 详情（若面板打开）。
+     */
+    async function refreshCurrentTrace() {
+        const panel = document.getElementById('tracePanel');
+        if (!panel.classList.contains('open') || !a2aSessionId) {
+            return;
+        }
+        try {
+            const encoded = encodeURIComponent(a2aSessionId);
+            const resp = await fetch(
+                    `${API_BASE_URL}/aiChat/a2aHost/traces/${encoded}`);
+            const t = await resp.json();
+            const detail = document.getElementById('traceDetail');
+            if (t && t.sessionId) {
+                detail.innerHTML = renderTraceDetail(t);
+            }
+            loadTraceList();
+        } catch (e) {
+            // 静默失败，不影响主流程
         }
     }
 

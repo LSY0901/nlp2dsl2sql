@@ -43,18 +43,37 @@ public class A2aHostModelRouter {
     }
 
     /**
-     * 按问题复杂度解析出模型。
+     * 按问题复杂度解析出模型（兼容旧用法）。
      *
      * @param question 用户问题
      * @return 选中的模型；无配置或构建失败时返回默认模型
      */
     public OpenAIChatModel resolve(String question) {
+        return route(question).model();
+    }
+
+    /**
+     * 按问题复杂度路由，返回档位与选中模型。
+     *
+     * @param question 用户问题
+     * @return 档位 + 模型
+     */
+    public ModelRoute route(String question) {
         String tier = classifier.classify(question);
         OpenAIChatModel model = resolveTier(tier);
         log.info("[ModelRouter] question={}, tier={}, model={}",
                 abbreviate(question), tier,
                 model == null ? "default" : model.getModelName());
-        return model;
+        return new ModelRoute(tier, model);
+    }
+
+    /**
+     * 模型路由结果：复杂度档位 + 选中模型。
+     *
+     * @param tier  复杂度档位
+     * @param model 选中模型
+     */
+    public record ModelRoute(String tier, OpenAIChatModel model) {
     }
 
     /**
