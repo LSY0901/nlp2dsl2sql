@@ -1,10 +1,10 @@
 package org.example.nlp2dsl2sql.a2a;
 
-import io.agentscope.core.hook.recorder.JsonlTraceExporter;
 import io.agentscope.core.tool.Toolkit;
 import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import io.agentscope.harness.agent.HarnessAgent;
 import io.agentscope.harness.agent.memory.compaction.CompactionConfig;
+import org.example.nlp2dsl2sql.a2a.trace.JsonlTraceMiddleware;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
@@ -19,17 +19,17 @@ import java.nio.file.Paths;
 public class A2aHostAgentFactory {
 
     private final A2aRemoteAgentTools tools;
-    private final ObjectProvider<JsonlTraceExporter> traceExporter;
+    private final ObjectProvider<JsonlTraceMiddleware> traceMiddleware;
 
     /**
-     * @param tools         A2A 远程 Agent 工具
-     * @param traceExporter JSONL trace 导出器（trace 关闭时不存在）
+     * @param tools           A2A 远程 Agent 工具
+     * @param traceMiddleware JSONL trace 中间件（trace 关闭时不存在）
      */
     public A2aHostAgentFactory(
             A2aRemoteAgentTools tools,
-            ObjectProvider<JsonlTraceExporter> traceExporter) {
+            ObjectProvider<JsonlTraceMiddleware> traceMiddleware) {
         this.tools = tools;
-        this.traceExporter = traceExporter;
+        this.traceMiddleware = traceMiddleware;
     }
 
     /**
@@ -61,9 +61,9 @@ public class A2aHostAgentFactory {
                         .keepMessages(10)
                         .build());
 
-        JsonlTraceExporter exporter = traceExporter.getIfAvailable();
-        if (exporter != null) {
-            builder.hook(exporter);
+        JsonlTraceMiddleware middleware = traceMiddleware.getIfAvailable();
+        if (middleware != null) {
+            builder.middleware(middleware);
         }
         return builder.build();
     }

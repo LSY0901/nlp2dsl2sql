@@ -1,7 +1,6 @@
 package org.example.nlp2dsl2sql.a2a;
 
 import io.agentscope.core.ReActAgent;
-import io.agentscope.core.hook.recorder.JsonlTraceExporter;
 import io.agentscope.core.permission.PermissionBehavior;
 import io.agentscope.core.permission.PermissionContextState;
 import io.agentscope.core.permission.PermissionMode;
@@ -9,6 +8,7 @@ import io.agentscope.core.permission.PermissionRule;
 import io.agentscope.core.tool.Toolkit;
 import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import org.example.nlp2dsl2sql.agent.Nlp2dsl2sqlAgent;
+import org.example.nlp2dsl2sql.a2a.trace.JsonlTraceMiddleware;
 import org.example.nlp2dsl2sql.tools.AgentToolRegistry;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
@@ -34,20 +34,20 @@ public class SqlQueryHitlAgentFactory {
 
     private final OpenAIChatModel model;
     private final AgentToolRegistry toolRegistry;
-    private final ObjectProvider<JsonlTraceExporter> traceExporter;
+    private final ObjectProvider<JsonlTraceMiddleware> traceMiddleware;
 
     /**
-     * @param model         LLM
-     * @param toolRegistry  问数工具集
-     * @param traceExporter JSONL trace 导出器（trace 关闭时不存在）
+     * @param model          LLM
+     * @param toolRegistry   问数工具集
+     * @param traceMiddleware JSONL trace 中间件（trace 关闭时不存在）
      */
     public SqlQueryHitlAgentFactory(
             OpenAIChatModel model,
             AgentToolRegistry toolRegistry,
-            ObjectProvider<JsonlTraceExporter> traceExporter) {
+            ObjectProvider<JsonlTraceMiddleware> traceMiddleware) {
         this.model = model;
         this.toolRegistry = toolRegistry;
-        this.traceExporter = traceExporter;
+        this.traceMiddleware = traceMiddleware;
     }
 
     /**
@@ -76,9 +76,9 @@ public class SqlQueryHitlAgentFactory {
                 .permissionContext(perm.build())
                 .maxIters(15);
 
-        JsonlTraceExporter exporter = traceExporter.getIfAvailable();
-        if (exporter != null) {
-            builder.hook(exporter);
+        JsonlTraceMiddleware middleware = traceMiddleware.getIfAvailable();
+        if (middleware != null) {
+            builder.middleware(middleware);
         }
         return builder.build();
     }
