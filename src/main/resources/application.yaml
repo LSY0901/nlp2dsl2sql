@@ -31,6 +31,22 @@ a2a:
     base-url: http://127.0.0.1:9003
     agent-card-path: /.well-known/agent-card.json
     timeout-ms: 60000
+  host:
+    model:
+      default-tier: strong
+      tiers:
+        fast:
+          model-name: qwen3.7-plus
+          api-key: sk-ws-H.EMYHDEP.UVLF.MEUCIHdyj1quR4PPQwzaimbfv-duaSnJnLNqw-SV9XBda9XzAiEA_BhT0M7_w6z75xskBqPrF1B4nRd7r_4VvGB2YvQoxM8
+          base-url: https://ws-rgijbwnyj4przbh8.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
+        strong:
+          model-name: deepseek-v4-flash-0731
+          api-key: sk-ws-H.EMYHDEP.UVLF.MEUCIHdyj1quR4PPQwzaimbfv-duaSnJnLNqw-SV9XBda9XzAiEA_BhT0M7_w6z75xskBqPrF1B4nRd7r_4VvGB2YvQoxM8
+          base-url: https://ws-rgijbwnyj4przbh8.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
+      complexity:
+        simple-keywords: [平均分, 最高分, 最低分, 是多少, 有多少, 数量, 总数]
+        complex-keywords: [对比, 比较, 分别, 各年级, 各个, 同比, 环比, 明细, 列出, 以及, 并且, 同时]
+        length-threshold: 60
 
 embedding:
   base-url: http://localhost:8082

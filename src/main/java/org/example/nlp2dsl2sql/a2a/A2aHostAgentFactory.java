@@ -4,28 +4,34 @@ import io.agentscope.core.tool.Toolkit;
 import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import io.agentscope.harness.agent.HarnessAgent;
 import io.agentscope.harness.agent.memory.compaction.CompactionConfig;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.stereotype.Component;
 
 import java.nio.file.Paths;
 
 /**
- * A2A Host HarnessAgent 配置。
+ * A2A Host Agent 工厂：按路由选出的模型每次请求新建 Host Agent。
+ * <p>
+ * 与 {@link SqlQueryHitlAgentFactory} 每查询新建模式一致，避免单例绑定单一模型。
  */
-@Configuration
-public class A2aHostAgentConfig {
+@Component
+public class A2aHostAgentFactory {
+
+    private final A2aRemoteAgentTools tools;
 
     /**
-     * Host Agent：只注册 A2A 远程工具。
-     *
-     * @param model LLM 模型
      * @param tools A2A 远程 Agent 工具
+     */
+    public A2aHostAgentFactory(A2aRemoteAgentTools tools) {
+        this.tools = tools;
+    }
+
+    /**
+     * 创建 Host Agent。
+     *
+     * @param model 路由选出的模型
      * @return 名为 a2aHostAgent 的 HarnessAgent
      */
-    @Bean(name = "a2aHostAgent")
-    public HarnessAgent a2aHostAgent(
-            OpenAIChatModel model,
-            A2aRemoteAgentTools tools) {
+    public HarnessAgent create(OpenAIChatModel model) {
         Toolkit toolkit = new Toolkit();
         toolkit.registerTool(tools);
 

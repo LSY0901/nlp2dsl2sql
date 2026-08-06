@@ -7,15 +7,17 @@ import io.agentscope.core.event.ToolCallStartEvent;
 import io.agentscope.core.event.ToolResultEndEvent;
 import io.agentscope.core.event.ToolResultTextDeltaEvent;
 import io.agentscope.core.message.UserMessage;
+import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import io.agentscope.harness.agent.HarnessAgent;
 import lombok.extern.slf4j.Slf4j;
+import org.example.nlp2dsl2sql.a2a.A2aHostAgentFactory;
 import org.example.nlp2dsl2sql.a2a.A2aHostChatContext;
+import org.example.nlp2dsl2sql.a2a.A2aHostModelRouter;
 import org.example.nlp2dsl2sql.a2a.A2aSqlConfirmRegistry;
 import org.example.nlp2dsl2sql.a2a.A2aSqlConfirmTexts;
 import org.example.nlp2dsl2sql.models.vo.A2aHostConfirmRequest;
 import org.example.nlp2dsl2sql.models.vo.A2aHostConfirmResponse;
 import org.example.nlp2dsl2sql.service.IA2aHostService;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -23,24 +25,30 @@ import java.util.UUID;
 
 /**
  * A2A Host SSE 服务（含 SQL HITL 确认桥接）。
+ * <p>
+ * Host Agent 每次请求按问题复杂度路由模型并新建，避免单例绑定单一模型。
  */
 @Slf4j
 @Service
 public class A2aHostServiceImpl implements IA2aHostService {
 
-    private final HarnessAgent a2aHostAgent;
+    private final A2aHostAgentFactory hostAgentFactory;
+    private final A2aHostModelRouter modelRouter;
     private final A2aSqlConfirmRegistry confirmRegistry;
 
     /**
      * 构造 A2A Host 服务。
      *
-     * @param a2aHostAgent     Host Agent
+     * @param hostAgentFactory Host Agent 工厂
+     * @param modelRouter      模型路由器
      * @param confirmRegistry  SQL 确认挂起表
      */
     public A2aHostServiceImpl(
-            @Qualifier("a2aHostAgent") HarnessAgent a2aHostAgent,
+            A2aHostAgentFactory hostAgentFactory,
+            A2aHostModelRouter modelRouter,
             A2aSqlConfirmRegistry confirmRegistry) {
-        this.a2aHostAgent = a2aHostAgent;
+        this.hostAgentFactory = hostAgentFactory;
+        this.modelRouter = modelRouter;
         this.confirmRegistry = confirmRegistry;
     }
 
@@ -63,16 +71,19 @@ public class A2aHostServiceImpl implements IA2aHostService {
                 : sessionId.trim();
         A2aHostChatContext hostCtx = new A2aHostChatContext(sid);
 
+        OpenAIChatModel model = modelRouter.resolve(trimmed);
+        HarnessAgent hostAgent = hostAgentFactory.create(model);
+
         RuntimeContext ctx = RuntimeContext.builder()
                 .userId("lsy")
                 .sessionId("0901")
                 .put(A2aHostChatContext.class, hostCtx)
                 .build();
 
-        log.info("━━━━━━━ A2A Host 启动 ━━━━━━━ sessionId={}, question={}",
-                sid, trimmed);
+        log.info("━━━━━━━ A2A Host 启动 ━━━━━━━ sessionId={}, model={}, question={}",
+                sid, model.getModelName(), trimmed);
 
-        Flux<String> agentFlux = a2aHostAgent
+        Flux<String> agentFlux = hostAgent
                 .streamEvents(new UserMessage(trimmed), ctx)
                 .mapNotNull(this::mapEventToSseChunk)
                 .doOnNext(chunk -> {
@@ -87,7 +98,9 @@ public class A2aHostServiceImpl implements IA2aHostService {
                 });
 
         Flux<String> bridgeFlux = hostCtx.getSseSink().asFlux();
-        Flux<String> head = Flux.just("sessionId: " + sid + "\n");
+        Flux<String> head = Flux.just(
+                "sessionId: " + sid + "\n",
+                "model: " + model.getModelName() + "\n");
 
         return Flux.merge(head, agentFlux, bridgeFlux)
                 .doOnError(e -> log.error("A2A Host 异常", e))
