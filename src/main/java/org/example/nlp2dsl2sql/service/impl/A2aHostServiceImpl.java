@@ -10,7 +10,7 @@ import io.agentscope.core.message.UserMessage;
 import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import io.agentscope.harness.agent.HarnessAgent;
 import lombok.extern.slf4j.Slf4j;
-import org.example.nlp2dsl2sql.a2a.A2aHostAgentFactory;
+import org.example.nlp2dsl2sql.a2a.A2aHostSessionManager;
 import org.example.nlp2dsl2sql.a2a.A2aHostChatContext;
 import org.example.nlp2dsl2sql.a2a.A2aHostModelRouter;
 import org.example.nlp2dsl2sql.a2a.A2aSqlConfirmRegistry;
@@ -36,7 +36,7 @@ import java.util.UUID;
 @Service
 public class A2aHostServiceImpl implements IA2aHostService {
 
-    private final A2aHostAgentFactory hostAgentFactory;
+    private final A2aHostSessionManager sessionManager;
     private final A2aHostModelRouter modelRouter;
     private final A2aSqlConfirmRegistry confirmRegistry;
     private final HostTraceRecorder traceRecorder;
@@ -44,17 +44,17 @@ public class A2aHostServiceImpl implements IA2aHostService {
     /**
      * 构造 A2A Host 服务。
      *
-     * @param hostAgentFactory Host Agent 工厂
+     * @param sessionManager   Host Agent 会话缓存管理器
      * @param modelRouter      模型路由器
      * @param confirmRegistry  SQL 确认挂起表
      * @param traceRecorder    trace 内存记录器
      */
     public A2aHostServiceImpl(
-            A2aHostAgentFactory hostAgentFactory,
+            A2aHostSessionManager sessionManager,
             A2aHostModelRouter modelRouter,
             A2aSqlConfirmRegistry confirmRegistry,
             HostTraceRecorder traceRecorder) {
-        this.hostAgentFactory = hostAgentFactory;
+        this.sessionManager = sessionManager;
         this.modelRouter = modelRouter;
         this.confirmRegistry = confirmRegistry;
         this.traceRecorder = traceRecorder;
@@ -83,11 +83,11 @@ public class A2aHostServiceImpl implements IA2aHostService {
         A2aHostModelRouter.ModelRoute route = modelRouter.route(trimmed);
         OpenAIChatModel model = route.model();
         traceRecorder.recordModel(sid, route.tier(), model.getModelName());
-        HarnessAgent hostAgent = hostAgentFactory.create(model);
+        HarnessAgent hostAgent = sessionManager.getOrCreateAgent(sid, model);
 
         RuntimeContext ctx = RuntimeContext.builder()
                 .userId("lsy")
-                .sessionId("0901")
+                .sessionId(sid)
                 .put(A2aHostChatContext.class, hostCtx)
                 .build();
 
