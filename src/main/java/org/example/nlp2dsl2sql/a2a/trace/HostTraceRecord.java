@@ -60,6 +60,9 @@ public class HostTraceRecord {
     /** 阶段时间线 */
     private List<Step> steps = new ArrayList<>();
 
+    /** 工具调用记录（host 层 + sql 层，按事件顺序） */
+    private List<ToolCallRecord> toolCalls = new ArrayList<>();
+
     /** 单调递增序号（仅用于同毫秒内稳定排序，不对外展示） */
     @JsonIgnore
     private long seq;
@@ -77,5 +80,30 @@ public class HostTraceRecord {
 
         /** 记录时间毫秒 */
         private long timeMs;
+    }
+
+    /**
+     * 单次工具调用记录。
+     */
+    @Data
+    public static class ToolCallRecord {
+
+        /** 层：host（编排器） / sql（SQL Agent 内层） */
+        private String layer;
+
+        /** 工具名，如 execute_sql */
+        private String name;
+
+        /** 工具调用 ID（AgentScope ToolUseBlock.id） */
+        private String toolCallId;
+
+        /** 结果状态：SUCCESS / ERROR / DENIED / INTERRUPTED 等 */
+        private String state;
+
+        /** 调用开始时间毫秒 */
+        private long startTimeMs;
+
+        /** 调用耗时毫秒 */
+        private long durationMs;
     }
 }

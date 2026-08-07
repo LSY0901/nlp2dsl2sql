@@ -111,6 +111,16 @@ public class HostTraceRecorder {
     }
 
     /**
+     * 记录一次工具调用（事件跟踪器在完成时调用）。
+     *
+     * @param sessionId  会话 ID
+     * @param toolCall   工具调用记录
+     */
+    public void tool(String sessionId, HostTraceRecord.ToolCallRecord toolCall) {
+        withRecord(sessionId, r -> r.getToolCalls().add(toolCall));
+    }
+
+    /**
      * 标记完成。
      *
      * @param sessionId 会话 ID

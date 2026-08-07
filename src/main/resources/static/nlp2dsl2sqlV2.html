@@ -389,6 +389,21 @@
         .trace-status.RUNNING { background: #dbeafe; color: #1e40af; }
         .trace-status.FAILED { background: #fee2e2; color: #991b1b; }
         .trace-status.CANCELLED { background: #f3f4f6; color: #6b7280; }
+        .trace-status.SUCCESS { background: #dcfce7; color: #166534; }
+        .trace-status.ERROR { background: #fee2e2; color: #991b1b; }
+        .trace-status.DENIED { background: #fef3c7; color: #92400e; }
+        .trace-status.INTERRUPTED { background: #f3f4f6; color: #6b7280; }
+
+        .trace-layer {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 1px 6px;
+            border-radius: 4px;
+            margin-right: 4px;
+            vertical-align: 1px;
+        }
+        .trace-layer-host { background: #ede9fe; color: #5b21b6; }
+        .trace-layer-sql { background: #e0f2fe; color: #075985; }
 
         .trace-model {
             font-size: 12px;
@@ -645,6 +660,18 @@
                     + `<span class="trace-step-time">+${(rel / 1000).toFixed(1)}s</span>`
                     + '</div>';
         }).join('');
+        const tools = (t.toolCalls || []).map(tc => {
+            const rel = Math.max(0, tc.startTimeMs - t.startTimeMs);
+            const layerBadge = tc.layer === 'host'
+                    ? '<span class="trace-layer trace-layer-host">HOST</span>'
+                    : '<span class="trace-layer trace-layer-sql">SQL</span>';
+            return '<div class="trace-step">'
+                    + `<span class="trace-step-name">${layerBadge} ${escapeHtml(tc.name)}</span>`
+                    + `<span class="trace-status ${escapeHtml(tc.state)}">${escapeHtml(tc.state)}</span>`
+                    + `<span class="trace-step-detail">${formatDuration(tc.durationMs)}</span>`
+                    + `<span class="trace-step-time">+${(rel / 1000).toFixed(1)}s</span>`
+                    + '</div>';
+        }).join('');
         return '<div class="trace-detail-head">'
                 + `<div>${escapeHtml(t.question || '')}</div>`
                 + '<div class="trace-meta">'
@@ -656,6 +683,7 @@
                 + '</div>'
                 + (t.error ? `<div class="trace-label">错误</div><div class="error-text">${escapeHtml(t.error)}</div>` : '')
                 + (t.sql ? `<div class="trace-label">SQL</div><pre class="answer-sql">${escapeHtml(t.sql)}</pre>` : '')
+                + (tools ? `<div class="trace-label">工具调用</div><div class="trace-steps">${tools}</div>` : '')
                 + (steps ? `<div class="trace-label">步骤时间线</div><div class="trace-steps">${steps}</div>` : '')
                 + `<div class="trace-label">JSONL 落盘</div><div class="trace-meta">.agentscope/traces/a2a-host.jsonl</div>`;
     }

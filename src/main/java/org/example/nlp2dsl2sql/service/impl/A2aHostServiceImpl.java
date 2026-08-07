@@ -15,6 +15,7 @@ import org.example.nlp2dsl2sql.a2a.A2aHostChatContext;
 import org.example.nlp2dsl2sql.a2a.A2aHostModelRouter;
 import org.example.nlp2dsl2sql.a2a.A2aSqlConfirmRegistry;
 import org.example.nlp2dsl2sql.a2a.A2aSqlConfirmTexts;
+import org.example.nlp2dsl2sql.a2a.trace.AgentEventToolTracer;
 import org.example.nlp2dsl2sql.a2a.trace.HostTraceRecord;
 import org.example.nlp2dsl2sql.a2a.trace.HostTraceRecorder;
 import org.example.nlp2dsl2sql.models.vo.A2aHostConfirmRequest;
@@ -91,18 +92,25 @@ public class A2aHostServiceImpl implements IA2aHostService {
                 .put(A2aHostChatContext.class, hostCtx)
                 .build();
 
+        AgentEventToolTracer hostTracer =
+                new AgentEventToolTracer(traceRecorder, sid, "host");
+
         log.info("━━━━━━━ A2A Host 启动 ━━━━━━━ sessionId={}, tier={}, model={}, question={}",
                 sid, route.tier(), model.getModelName(), trimmed);
 
         Flux<String> agentFlux = hostAgent
                 .streamEvents(new UserMessage(trimmed), ctx)
-                .mapNotNull(this::mapEventToSseChunk)
+                .mapNotNull(event -> {
+                    hostTracer.onEvent(event);
+                    return mapEventToSseChunk(event);
+                })
                 .doOnNext(chunk -> {
                     if (log.isDebugEnabled()) {
                         log.debug("[SSE] chunk={}", abbreviate(chunk));
                     }
                 })
                 .doFinally(signal -> {
+                    hostTracer.endAll();
                     hostCtx.complete();
                     log.info("━━━━━━━ A2A Host 完成 signal={} ━━━━━━━",
                             signal);

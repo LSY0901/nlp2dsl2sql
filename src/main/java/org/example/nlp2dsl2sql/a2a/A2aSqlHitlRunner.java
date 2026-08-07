@@ -12,9 +12,11 @@ import io.agentscope.core.event.ToolResultTextDeltaEvent;
 import io.agentscope.core.message.GenerateReason;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
+import io.agentscope.core.message.ToolResultState;
 import io.agentscope.core.message.ToolUseBlock;
 import io.agentscope.core.message.UserMessage;
 import lombok.extern.slf4j.Slf4j;
+import org.example.nlp2dsl2sql.a2a.trace.AgentEventToolTracer;
 import org.example.nlp2dsl2sql.a2a.trace.HostTraceRecorder;
 import org.example.nlp2dsl2sql.models.dto.dsl.AgentSessionContext;
 import org.springframework.stereotype.Component;
@@ -79,21 +81,24 @@ public class A2aSqlHitlRunner {
         StringBuilder finalText = new StringBuilder();
         Duration phaseTimeout = Duration.ofMillis(Math.max(timeoutMs, 60_000L));
         AtomicBoolean userDenied = new AtomicBoolean(false);
+        AgentEventToolTracer toolTracer = new AgentEventToolTracer(
+                traceRecorder, hostCtx.getSessionId(), "sql");
 
         try {
             for (AgentEvent event : agent
                     .streamEvents(new UserMessage(query.trim()), sqlCtx)
                     .toIterable()) {
+                toolTracer.onEvent(event);
                 if (event instanceof RequireUserConfirmEvent confirm) {
                     if (userDenied.get()) {
                         autoDenyAsking(
                                 confirm.getToolCalls(), agent, sqlCtx,
-                                phaseTimeout);
+                                phaseTimeout, toolTracer);
                         continue;
                     }
                     boolean approved = resumeAfterConfirm(
                             confirm, hostCtx, agent, sqlCtx,
-                            finalText, phaseTimeout, 0);
+                            finalText, phaseTimeout, 0, toolTracer);
                     if (!approved) {
                         userDenied.set(true);
                         break;
@@ -105,7 +110,9 @@ public class A2aSqlHitlRunner {
                 }
                 appendAndEmit(event, hostCtx, finalText);
             }
+            toolTracer.endAll();
         } catch (Exception e) {
+            toolTracer.endAll();
             log.warn("[HITL] SQL Agent 流式执行失败: {}", e.getMessage());
             return "SQL Agent 调用失败: " + e.getMessage();
         }
@@ -129,13 +136,14 @@ public class A2aSqlHitlRunner {
             RuntimeContext sqlCtx,
             StringBuilder finalText,
             Duration phaseTimeout,
-            int depth) {
+            int depth,
+            AgentEventToolTracer toolTracer) {
         if (depth >= 3) {
             hostCtx.emit(A2aSqlConfirmTexts.formatResult(
                     false, "确认次数超限"));
             finishDenied(
                     agent, sqlCtx, confirm.getToolCalls(),
-                    phaseTimeout, hostCtx, finalText);
+                    phaseTimeout, hostCtx, finalText, toolTracer);
             return false;
         }
         List<ToolUseBlock> toolCalls = confirm.getToolCalls();
@@ -146,6 +154,7 @@ public class A2aSqlHitlRunner {
 
         String sql = extractSql(toolCalls);
         String toolCallId = toolCalls.get(0).getId();
+        String toolName = toolCalls.get(0).getName();
         traceRecorder.sql(hostCtx.getSessionId(), sql);
         hostCtx.emit(A2aSqlConfirmTexts.formatPending(
                 hostCtx.getSessionId(), toolCallId, sql));
@@ -160,18 +169,27 @@ public class A2aSqlHitlRunner {
         if (!approved) {
             finishDenied(
                     agent, sqlCtx, toolCalls,
-                    phaseTimeout, hostCtx, finalText);
+                    phaseTimeout, hostCtx, finalText, toolTracer);
+            toolTracer.complete(toolCallId, toolName,
+                    ToolResultState.DENIED.name(), 0L);
             return false;
         }
 
+        long execStart = System.currentTimeMillis();
         Msg resumeMsg = buildResumeMsg(true, toolCalls);
         try {
             Msg result = agent.call(List.of(resumeMsg), sqlCtx)
                     .block(phaseTimeout);
+            toolTracer.complete(toolCallId, toolName,
+                    ToolResultState.SUCCESS.name(),
+                    System.currentTimeMillis() - execStart);
             return handleApprovedResumeResult(
                     result, hostCtx, agent, sqlCtx,
-                    finalText, phaseTimeout, depth);
+                    finalText, phaseTimeout, depth, toolTracer);
         } catch (Exception e) {
+            toolTracer.complete(toolCallId, toolName,
+                    ToolResultState.ERROR.name(),
+                    System.currentTimeMillis() - execStart);
             log.warn("[HITL] 恢复执行失败: {}", e.getMessage());
             String err = "SQL 确认后恢复失败: " + e.getMessage();
             hostCtx.emit(err);
@@ -189,7 +207,8 @@ public class A2aSqlHitlRunner {
             List<ToolUseBlock> toolCalls,
             Duration phaseTimeout,
             A2aHostChatContext hostCtx,
-            StringBuilder finalText) {
+            StringBuilder finalText,
+            AgentEventToolTracer toolTracer) {
         try {
             Msg result = agent.call(
                     List.of(buildResumeMsg(false, toolCalls)), sqlCtx)
@@ -227,11 +246,19 @@ public class A2aSqlHitlRunner {
             List<ToolUseBlock> toolCalls,
             ReActAgent agent,
             RuntimeContext sqlCtx,
-            Duration phaseTimeout) {
+            Duration phaseTimeout,
+            AgentEventToolTracer toolTracer) {
         if (toolCalls == null || toolCalls.isEmpty()) {
             return;
         }
         try {
+            for (ToolUseBlock block : toolCalls) {
+                if (block == null || block.getId() == null) {
+                    continue;
+                }
+                toolTracer.complete(block.getId(), block.getName(),
+                        ToolResultState.DENIED.name(), 0L);
+            }
             agent.call(List.of(buildResumeMsg(false, toolCalls)), sqlCtx)
                     .block(phaseTimeout);
         } catch (Exception e) {
@@ -278,7 +305,8 @@ public class A2aSqlHitlRunner {
             RuntimeContext sqlCtx,
             StringBuilder finalText,
             Duration phaseTimeout,
-            int depth) {
+            int depth,
+            AgentEventToolTracer toolTracer) {
         if (result == null) {
             return true;
         }
@@ -294,7 +322,7 @@ public class A2aSqlHitlRunner {
                                 asking);
                 return resumeAfterConfirm(
                         again, hostCtx, agent, sqlCtx,
-                        finalText, phaseTimeout, depth + 1);
+                        finalText, phaseTimeout, depth + 1, toolTracer);
             }
         }
         String text = A2aMsgTexts.extract(result);

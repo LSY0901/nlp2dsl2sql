@@ -13,7 +13,7 @@ agentscope:
   model:
     provider: openai
   openai:
-    api-key: sk-7754daa0e1a7460e9f490ad944aad870
+    api-key:
     base-url: https://api.deepseek.com
     model-name: deepseek-v4-flash
   a2a:
@@ -37,11 +37,11 @@ a2a:
       tiers:
         fast:
           model-name: qwen3.7-plus
-          api-key: sk-ws-H.ERIIIIX.Dc5b.MEUCIA3cXMbD6v-LM1DHJpPpQjreB5D5yASITjGkK_chdt2zAiEA8xsvMVzwlzAO9YGW1H4N3PpeVfbvPa0ch9JR9q9gSzo
+          api-key:
           base-url: https://ws-rgijbwnyj4przbh8.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
         strong:
           model-name: deepseek-v4-flash-0731
-          api-key: sk-ws-H.ERIIIIX.Dc5b.MEUCIA3cXMbD6v-LM1DHJpPpQjreB5D5yASITjGkK_chdt2zAiEA8xsvMVzwlzAO9YGW1H4N3PpeVfbvPa0ch9JR9q9gSzo
+          api-key:
           base-url: https://ws-rgijbwnyj4przbh8.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
       complexity:
         simple-keywords: [平均分, 最高分, 最低分, 是多少, 有多少, 数量, 总数]
