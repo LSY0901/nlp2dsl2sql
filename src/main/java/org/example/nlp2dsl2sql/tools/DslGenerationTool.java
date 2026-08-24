@@ -1,6 +1,6 @@
 package org.example.nlp2dsl2sql.tools;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.alibaba.fastjson2.JSON;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.message.TextBlock;
@@ -29,7 +29,6 @@ public class DslGenerationTool {
 
     private final OpenAIChatModel openAIChatModel;
     private final CandidateContextTool candidateContextTool;
-    private final ObjectMapper objectMapper;
 
     /**
      * 生成语义查询 DSL。
@@ -67,8 +66,7 @@ public class DslGenerationTool {
 
         try {
             String json = extractJson(response);
-            SemanticQueryDSL dsl =
-                    objectMapper.readValue(json, SemanticQueryDSL.class);
+            SemanticQueryDSL dsl = JSON.parseObject(json, SemanticQueryDSL.class);
             log.info("━━━ [Multi-Agent] DslGenerationTool 完成 ━━━");
             return dsl;
         } catch (Exception e) {

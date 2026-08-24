@@ -1,6 +1,6 @@
 package org.example.nlp2dsl2sql.service.pipeline.impl;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.alibaba.fastjson2.JSON;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.message.TextBlock;
@@ -31,7 +31,6 @@ public class DslGeneratePipelineServiceImpl implements IDslGeneratePipelineServi
 
     private final OpenAIChatModel openAIChatModel;
     private final CandidateContextTool candidateContextTool;
-    private final ObjectMapper objectMapper;
 
     /**
      * 生成语义 DSL。
@@ -63,8 +62,7 @@ public class DslGeneratePipelineServiceImpl implements IDslGeneratePipelineServi
 
         try {
             String json = extractJson(response);
-            SemanticQueryDSL dsl =
-                    objectMapper.readValue(json, SemanticQueryDSL.class);
+            SemanticQueryDSL dsl = JSON.parseObject(json, SemanticQueryDSL.class);
             log.info("━━━ [Pipeline] GENERATE_DSL 完成 ━━━");
             return dsl;
         } catch (Exception e) {

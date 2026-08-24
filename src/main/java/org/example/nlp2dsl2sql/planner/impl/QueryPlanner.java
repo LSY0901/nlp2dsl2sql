@@ -1,7 +1,7 @@
 package org.example.nlp2dsl2sql.planner.impl;
 
 import com.alibaba.fastjson2.JSON;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.alibaba.fastjson2.JSON;
 import io.agentscope.core.formatter.ResponseFormat;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
@@ -31,7 +31,6 @@ import java.util.List;
 public class QueryPlanner implements IQueryPlanner {
 
     private final OpenAIChatModel openAIChatModel;
-    private final ObjectMapper objectMapper;
 
     /**
      * 生成初始查询计划。
@@ -104,7 +103,7 @@ public class QueryPlanner implements IQueryPlanner {
     private QueryPlan parseAndNormalize(String response) {
         try {
             String json = extractJson(response);
-            QueryPlan plan = objectMapper.readValue(json, QueryPlan.class);
+            QueryPlan plan = JSON.parseObject(json, QueryPlan.class);
             if (plan.getMaxReplan() <= 0) {
                 plan.setMaxReplan(2);
             }

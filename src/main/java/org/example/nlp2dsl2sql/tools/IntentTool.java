@@ -1,6 +1,6 @@
 package org.example.nlp2dsl2sql.tools;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.alibaba.fastjson2.JSON;
 import io.agentscope.core.formatter.ResponseFormat;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
@@ -29,7 +29,6 @@ import java.util.Optional;
 public class IntentTool {
 
     private final OpenAIChatModel openAIChatModel;
-    private final ObjectMapper objectMapper;
     private final RuleIntentClassifier ruleIntentClassifier;
 
     /**
@@ -70,7 +69,7 @@ public class IntentTool {
 
         try {
             String json = extractJson(response);
-            IntentResult result = objectMapper.readValue(json, IntentResult.class);
+            IntentResult result = JSON.parseObject(json, IntentResult.class);
             IntentResult.IntentType type = result.resolveIntentType();
             result.setIntent(type.name());
             log.info("━━━ [Multi-Agent] IntentTool 完成: intent={}, confidence={} ━━━",

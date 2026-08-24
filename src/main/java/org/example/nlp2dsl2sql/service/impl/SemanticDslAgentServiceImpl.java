@@ -15,7 +15,6 @@ import org.example.nlp2dsl2sql.tools.IntentTool;
 import org.example.nlp2dsl2sql.tools.ReviewTool;
 import org.example.nlp2dsl2sql.tools.SqlExecuteTool;
 import com.alibaba.fastjson2.JSON;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.message.TextBlock;
@@ -48,7 +47,6 @@ public class SemanticDslAgentServiceImpl implements ISemanticDslAgentService {
     private final ReviewTool reviewTool;
     private final SqlExecuteTool sqlExecuteTool;
     private final IntentTool intentTool;
-    private final ObjectMapper objectMapper;
 
     @Override
     public Flux<String> nlp2Dsl2SqlAgentV2(String question) {
@@ -92,7 +90,7 @@ public class SemanticDslAgentServiceImpl implements ISemanticDslAgentService {
 
         // Stage 3: 语义DSL生成
         SemanticQueryDSL semanticDSL = generateSemanticDSL(question, candidate, intentType);
-        log.info("[Stage 3] 语义DSL: {}", objectMapper.writeValueAsString(semanticDSL));
+        log.info("[Stage 3] 语义DSL: {}", JSON.toJSONString(semanticDSL));
 
         // Stage 4: DSL校验
         SemanticDslValidator.ValidationResult validation =
@@ -168,7 +166,7 @@ public class SemanticDslAgentServiceImpl implements ISemanticDslAgentService {
 
         try {
             String json = extractJson(response);
-            return objectMapper.readValue(json, SemanticQueryDSL.class);
+            return JSON.parseObject(json, SemanticQueryDSL.class);
         } catch (Exception e) {
             log.error("DSL解析失败: {}, raw={}", e.getMessage(), response);
             throw new PipelineException("DSL解析失败，请重试");

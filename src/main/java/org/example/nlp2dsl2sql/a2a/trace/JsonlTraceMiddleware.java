@@ -1,8 +1,7 @@
 package org.example.nlp2dsl2sql.a2a.trace;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import io.agentscope.core.agent.Agent;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
@@ -32,7 +31,6 @@ public class JsonlTraceMiddleware implements MiddlewareBase, Closeable {
 
     private final BufferedWriter writer;
     private final boolean flushEveryLine;
-    private final ObjectMapper mapper = new ObjectMapper();
 
     /**
      * @param file           目标 JSONL 文件
@@ -72,7 +70,7 @@ public class JsonlTraceMiddleware implements MiddlewareBase, Closeable {
      */
     private void record(AgentEvent event) {
         try {
-            ObjectNode node = mapper.valueToTree(event);
+            JSONObject node = (JSONObject) JSON.toJSON(event);
             node.put("eventClass", event.getClass().getSimpleName());
             append(node);
         } catch (Exception e) {
@@ -91,7 +89,7 @@ public class JsonlTraceMiddleware implements MiddlewareBase, Closeable {
 
     private void recordFallback(String type, String eventClass, String error) {
         try {
-            ObjectNode node = mapper.createObjectNode();
+            JSONObject node = new JSONObject();
             node.put("time", System.currentTimeMillis());
             node.put("type", type);
             if (eventClass != null) {
@@ -106,8 +104,8 @@ public class JsonlTraceMiddleware implements MiddlewareBase, Closeable {
         }
     }
 
-    private void append(JsonNode node) throws IOException {
-        String line = mapper.writeValueAsString(node);
+    private void append(JSONObject node) throws IOException {
+        String line = JSON.toJSONString(node);
         synchronized (writer) {
             writer.write(line);
             writer.newLine();
