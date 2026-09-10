@@ -1,7 +1,6 @@
 package org.example.nlp2dsl2sql.planner.impl;
 
 import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSON;
 import io.agentscope.core.formatter.ResponseFormat;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;

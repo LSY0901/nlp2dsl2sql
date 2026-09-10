@@ -271,9 +271,18 @@ public class A2aSqlHitlRunner {
      */
     private boolean waitDecision(
             PendingSqlConfirm pending, A2aHostChatContext hostCtx) {
+        return waitDecision(
+                pending, hostCtx, A2aSqlConfirmRegistry.TIMEOUT_MS);
+    }
+
+    /**
+     * 阻塞等待用户决策；超时视为拒绝（timeoutMs 仅供测试注入短超时）。
+     */
+    boolean waitDecision(
+            PendingSqlConfirm pending, A2aHostChatContext hostCtx, long timeoutMs) {
         try {
             boolean approved = pending.getDecision().get(
-                    A2aSqlConfirmRegistry.TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                    timeoutMs, TimeUnit.MILLISECONDS);
             traceRecorder.hitl(hostCtx.getSessionId(), approved,
                     approved ? null : "user denied");
             hostCtx.emit(A2aSqlConfirmTexts.formatResult(
