@@ -1,0 +1,182 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "A2A 接口端到端执行流程",
+    "subtitle": "模型分层路由 · 复合意图拆解 · SQL人机协同(HITL) · 串行调用SOP · 三路流合并",
+    "animation": "trace",
+    "visual_preset": "signal-flow",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "full-flow",
+        "label": "主链路：查数+规范综合",
+        "focus": ["user_req", "model_router", "host_agent", "sql_prep", "hitl_gate", "sql_db", "sop_agent", "flux_merge", "final_stream"],
+        "note": "完整端到端时序：用户提问经分层路由与意图拆解，串行先SQL查数、HITL审批、再调SOP，最后三路流汇聚输出。"
+      },
+      {
+        "id": "hitl-gate-view",
+        "label": "SQL HITL 审批防线",
+        "focus": ["sql_prep", "hitl_gate", "sql_db"],
+        "note": "拦截 execute_sql 动作，经 SSE 桥透传待审 SQL，由用户输入 yes/确认 放行执行。"
+      },
+      {
+        "id": "sop-stream-view",
+        "label": "SOP调用与流汇聚",
+        "focus": ["sql_db", "sop_agent", "flux_merge", "final_stream"],
+        "note": "SQL 完成后串行通过 A2aAgent.call 请求远端 SOP Server，结果统一汇入 Flux.merge 实时推流。"
+      }
+    ],
+    "output": "docs/a2a-workflow.html"
+  },
+  "lanes": [
+    { "id": "ui", "label": "客户端与前端页面 (Web Client)" },
+    { "id": "host", "label": "A2A Host 编排与路由 (Host Core)" },
+    { "id": "sql_hitl", "label": "本地 SQL 智能体与 HITL 审批" },
+    { "id": "sop_remote", "label": "远端 SOP 智能体 (A2A 9003)" }
+  ],
+  "phases": [
+    { "id": "intake", "label": "接入与路由", "fromCol": 0, "toCol": 1 },
+    { "id": "planning", "label": "意图拆解与调度", "fromCol": 2, "toCol": 2, "variant": "emphasis" },
+    { "id": "sql_phase", "label": "阶段一: SQL查数与HITL", "fromCol": 3, "toCol": 4, "variant": "security" },
+    { "id": "synthesis", "label": "阶段二: SOP与流合并", "fromCol": 5, "toCol": 5, "variant": "dashed" }
+  ],
+  "groups": [
+    { "id": "g_route", "label": "模型路由与头信息", "lane": "host", "fromCol": 1, "toCol": 1, "variant": "default" },
+    { "id": "g_hitl", "label": "HITL 人机审批防线", "lane": "sql_hitl", "fromCol": 3, "toCol": 4, "variant": "security" },
+    { "id": "g_stream", "label": "三路流汇聚呈现", "lane": "host", "fromCol": 5, "toCol": 5, "variant": "dashed" }
+  ],
+  "mainPath": [
+    "user_req",
+    "model_router",
+    "host_agent",
+    "sql_prep",
+    "hitl_gate",
+    "sql_db",
+    "sop_agent",
+    "flux_merge",
+    "final_stream"
+  ],
+  "nodes": [
+    {
+      "id": "user_req",
+      "lane": "ui",
+      "col": 0,
+      "type": "frontend",
+      "label": "客户端提问",
+      "sublabel": "GET /aiChat/a2aHost",
+      "tag": "复合问题",
+      "width": 136
+    },
+    {
+      "id": "model_router",
+      "lane": "host",
+      "col": 1,
+      "type": "backend",
+      "label": "复杂度路由",
+      "sublabel": "Fast / Strong 模型分流",
+      "tag": "下发 head",
+      "width": 136
+    },
+    {
+      "id": "host_agent",
+      "lane": "host",
+      "col": 2,
+      "type": "backend",
+      "label": "Host 意图拆解",
+      "sublabel": "规划: 先SQL后SOP",
+      "tag": "HarnessAgent",
+      "width": 136
+    },
+    {
+      "id": "sql_prep",
+      "lane": "sql_hitl",
+      "col": 2,
+      "type": "backend",
+      "label": "启动 SQL 子问",
+      "sublabel": "检索→DSL→审查管线",
+      "tag": "步骤1: 查数",
+      "width": 136
+    },
+    {
+      "id": "hitl_gate",
+      "lane": "sql_hitl",
+      "col": 3,
+      "type": "security",
+      "label": "HITL 审批门禁",
+      "sublabel": "拦截 execute_sql",
+      "tag": "输入 yes/确认",
+      "width": 136
+    },
+    {
+      "id": "sql_db",
+      "lane": "sql_hitl",
+      "col": 4,
+      "type": "database",
+      "label": "PostgreSQL 查库",
+      "sublabel": "pgvector 与数据查询",
+      "tag": "返回数据结果",
+      "width": 136
+    },
+    {
+      "id": "sop_agent",
+      "lane": "sop_remote",
+      "col": 4,
+      "type": "cloud",
+      "label": "调用远端 SOP",
+      "sublabel": "A2aAgent.call 请求",
+      "tag": "步骤2: 查规范",
+      "width": 136
+    },
+    {
+      "id": "flux_merge",
+      "lane": "host",
+      "col": 5,
+      "type": "messagebus",
+      "label": "三路数据流汇聚",
+      "sublabel": "head + agent + bridge",
+      "tag": "Flux.merge",
+      "width": 136
+    },
+    {
+      "id": "final_stream",
+      "lane": "ui",
+      "col": 5,
+      "type": "frontend",
+      "label": "SSE 实时推流",
+      "sublabel": "逐字呈现最终回答",
+      "tag": "SSE 闭环",
+      "width": 136
+    }
+  ],
+  "edges": [
+    { "id": "e_req", "from": "user_req", "to": "model_router", "label": "HTTP GET", "variant": "default" },
+    { "id": "e_route", "from": "model_router", "to": "host_agent", "label": "强模型驱动", "variant": "emphasis" },
+    { "id": "e_sub1", "from": "host_agent", "to": "sql_prep", "label": "派发查数", "variant": "emphasis" },
+    { "id": "e_ask", "from": "sql_prep", "to": "hitl_gate", "label": "请求审批", "variant": "security" },
+    { "id": "e_approved", "from": "hitl_gate", "to": "sql_db", "label": "批准执行", "variant": "emphasis" },
+    { "id": "e_sub2", "from": "sql_db", "to": "sop_agent", "label": "派发SOP", "variant": "emphasis" },
+    { "id": "e_sop_done", "from": "sop_agent", "to": "flux_merge", "label": "SOP结果", "variant": "default" },
+    { "id": "e_sql_done", "from": "sql_db", "to": "flux_merge", "label": "SQL结果", "variant": "dashed" },
+    { "id": "e_stream", "from": "flux_merge", "to": "final_stream", "label": "SSE推送", "variant": "emphasis", "role": "return" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "A2A 核心协作准则",
+      "items": [
+        "串行调度：Host Agent 严格先调 call_sql_agent，后调 call_sop_agent",
+        "HITL 防线：在真正落库执行 SQL 前拦截 execute_sql，等待用户确认输入",
+        "流式合并：head 首包元数据、Host 主推理、SQL 过程流统一经 Flux.merge 实时穿透"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "容错与降级设计",
+      "items": [
+        "用户拒绝或 5 分钟超时取消 SQL，子查询安全熔断并降级继续执行 SOP",
+        "SOP 远端异常时明确告知失败项，仍基于 SQL 成功数据生成完整回答"
+      ]
+    }
+  ]
+}
