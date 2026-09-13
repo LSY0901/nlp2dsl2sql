@@ -154,6 +154,74 @@ public class HostTraceRecorder {
     }
 
     /**
+     * 开启一个计时阶段：结束时（close）回填耗时并打结构化日志。
+     * <p>
+     * 配合 try-with-resources 使用，保证异常路径也 closed：
+     * <pre>
+     * try (var timer = traceRecorder.timedStep(sid, "hitl-wait", null)) {
+     *     ...
+     *     timer.detail("approved");
+     * }
+     * </pre>
+     *
+     * @param sessionId 会话 ID
+     * @param name      阶段名
+     * @param detail    阶段详情（可在 close 前用 detail() 追加结果）
+     * @return 计时句柄；会话不存在时返回空句柄（只打日志，不写 trace）
+     */
+    public TimedStep timedStep(String sessionId, String name, String detail) {
+        HostTraceRecord.Step step = new HostTraceRecord.Step();
+        step.setName(name);
+        step.setDetail(detail);
+        step.setTimeMs(System.currentTimeMillis());
+        withRecord(sessionId, r -> r.getSteps().add(step));
+        return new TimedStep(sessionId, step, System.nanoTime());
+    }
+
+    /**
+     * 计时阶段句柄。
+     */
+    public class TimedStep implements AutoCloseable {
+
+        private final String sessionId;
+        private final HostTraceRecord.Step step;
+        private final long startNanos;
+        private boolean closed;
+
+        private TimedStep(String sessionId, HostTraceRecord.Step step, long startNanos) {
+            this.sessionId = sessionId;
+            this.step = step;
+            this.startNanos = startNanos;
+        }
+
+        /**
+         * 补充阶段结果详情（在 close 前调用）。
+         *
+         * @param detail 结果详情
+         * @return this
+         */
+        public TimedStep detail(String detail) {
+            step.setDetail(detail);
+            return this;
+        }
+
+        /**
+         * 结束计时：回填耗时并打结构化日志；重复调用无副作用。
+         */
+        @Override
+        public void close() {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            long durationMs = Math.max(0, (System.nanoTime() - startNanos) / 1_000_000);
+            step.setDurationMs(durationMs);
+            log.info("[Trace] sessionId={} phase={} durationMs={} detail={}",
+                    sessionId, step.getName(), durationMs, step.getDetail());
+        }
+    }
+
+    /**
      * 取单条 trace。
      *
      * @param sessionId 会话 ID

@@ -280,25 +280,32 @@ public class A2aSqlHitlRunner {
      */
     boolean waitDecision(
             PendingSqlConfirm pending, A2aHostChatContext hostCtx, long timeoutMs) {
+        HostTraceRecorder.TimedStep timer = traceRecorder.timedStep(
+                hostCtx.getSessionId(), "hitl-wait", null);
         try {
             boolean approved = pending.getDecision().get(
                     timeoutMs, TimeUnit.MILLISECONDS);
+            timer.detail(approved ? "approved" : "user denied");
             traceRecorder.hitl(hostCtx.getSessionId(), approved,
                     approved ? null : "user denied");
             hostCtx.emit(A2aSqlConfirmTexts.formatResult(
                     approved, approved ? null : "user denied"));
             return approved;
         } catch (TimeoutException e) {
+            timer.detail("timeout");
             pending.getDecision().complete(false);
             traceRecorder.hitl(hostCtx.getSessionId(), false, "timeout");
             hostCtx.emit(A2aSqlConfirmTexts.formatResult(false, "timeout"));
             return false;
         } catch (Exception e) {
+            timer.detail("error: " + e.getMessage());
             pending.getDecision().complete(false);
             traceRecorder.hitl(hostCtx.getSessionId(), false, e.getMessage());
             hostCtx.emit(A2aSqlConfirmTexts.formatResult(
                     false, e.getMessage()));
             return false;
+        } finally {
+            timer.close();
         }
     }
 

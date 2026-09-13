@@ -98,6 +98,9 @@ public class A2aHostServiceImpl implements IA2aHostService {
         log.info("━━━━━━━ A2A Host 启动 ━━━━━━━ sessionId={}, tier={}, model={}, question={}",
                 sid, route.tier(), model.getModelName(), trimmed);
 
+        HostTraceRecorder.TimedStep loopTimer =
+                traceRecorder.timedStep(sid, "host-loop", null);
+
         Flux<String> agentFlux = hostAgent
                 .streamEvents(new UserMessage(trimmed), ctx)
                 .mapNotNull(event -> {
@@ -112,6 +115,8 @@ public class A2aHostServiceImpl implements IA2aHostService {
                 .doFinally(signal -> {
                     hostTracer.endAll();
                     hostCtx.complete();
+                    loopTimer.detail("signal=" + signal);
+                    loopTimer.close();
                     log.info("━━━━━━━ A2A Host 完成 signal={} ━━━━━━━",
                             signal);
                 });

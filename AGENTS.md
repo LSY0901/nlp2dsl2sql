@@ -48,6 +48,7 @@ java -jar target/Nlp2dsl2sql-0.0.1-SNAPSHOT.jar
 - 构造器注入配合 Lombok `@RequiredArgsConstructor`，不用字段 `@Autowired`。
 - 日志用 `@Slf4j`，关键阶段用 `━━━ [阶段名] ... ━━━` 分隔符便于追踪。
 - 业务异常用 `Nlp2dsl2sqlException`；V2 管线内部失败转成 SSE 错误文本返回，不向上抛栈。
+- A2A Host 阶段耗时统一走 `traceRecorder.timedStep(sid, name, detail)` + try-with-resources，`close()` 自动回填 `durationMs` 并打 `[Trace] sessionId/phase/durationMs` 结构化日志；时间点事件才用 `step()`。
 - LLM 调用统一 `OpenAIChatModel.stream()` + `blockLast()` 聚合取全文本；DeepSeek 不支持 json_schema，结构化输出用 `ResponseFormat.jsonObject()` + 提示词内嵌格式说明。
 - LLM 返回的 JSON 先经 `extractJson` 截取花括号子串再解析，解析失败必须有兜底分支。
 - SSE 接口签名固定为 `Flux<String>` 加 `produces = TEXT_EVENT_STREAM_VALUE`。

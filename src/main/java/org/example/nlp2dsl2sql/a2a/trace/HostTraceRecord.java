@@ -80,6 +80,9 @@ public class HostTraceRecord {
 
         /** 记录时间毫秒 */
         private long timeMs;
+
+        /** 阶段耗时毫秒（0 表示时间点事件，未计量耗时） */
+        private long durationMs;
     }
 
     /**

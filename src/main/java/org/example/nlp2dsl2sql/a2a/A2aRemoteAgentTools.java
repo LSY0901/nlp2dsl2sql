@@ -71,9 +71,10 @@ public class A2aRemoteAgentTools {
         if (hostCtx != null) {
             log.info("[HITL] 本地 SQL Agent, sessionId={}, query={}",
                     hostCtx.getSessionId(), query);
-            traceRecorder.step(hostCtx.getSessionId(),
-                    "call_sql_agent", query.trim());
-            return sqlHitlRunner.run(query.trim(), hostCtx, timeoutMs);
+            try (var timer = traceRecorder.timedStep(
+                    hostCtx.getSessionId(), "call_sql_agent", query.trim())) {
+                return sqlHitlRunner.run(query.trim(), hostCtx, timeoutMs);
+            }
         }
         return callRemote("SQL", sqlAgent, query, timeoutMs);
     }
