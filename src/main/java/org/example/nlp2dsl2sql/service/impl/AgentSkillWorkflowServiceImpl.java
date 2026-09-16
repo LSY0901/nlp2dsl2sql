@@ -24,9 +24,6 @@ import reactor.core.publisher.Flux;
 @Service
 public class AgentSkillWorkflowServiceImpl implements IAgentSkillWorkflowService {
 
-    private static final String USER_ID = "lsy";
-    private static final String SESSION_ID = "0901";
-
     private final HarnessAgent skillHarnessAgent;
 
     /**
@@ -48,19 +45,39 @@ public class AgentSkillWorkflowServiceImpl implements IAgentSkillWorkflowService
      */
     @Override
     public Flux<String> run(String question) {
+        return run(null, null, question);
+    }
+
+    /**
+     * 执行 Skill Harness 查询（带 sessionId 与 userId）。
+     *
+     * @param sessionId 会话 ID
+     * @param userId    用户 ID
+     * @param question  用户问题
+     * @return SSE 流
+     */
+    @Override
+    public Flux<String> run(String sessionId, String userId, String question) {
         if (question == null || question.isBlank()) {
             return Flux.just("错误: 问题不能为空");
         }
         String trimmed = question.trim();
+        String sid = (sessionId != null && !sessionId.isBlank())
+                ? sessionId.trim()
+                : java.util.UUID.randomUUID().toString();
+        String uid = (userId != null && !userId.isBlank())
+                ? userId.trim()
+                : "user_" + (sid.length() > 8 ? sid.substring(0, 8) : sid);
+
         AgentSessionContext session = new AgentSessionContext();
         RuntimeContext ctx = RuntimeContext.builder()
-                .userId(USER_ID)
-                .sessionId(SESSION_ID)
+                .userId(uid)
+                .sessionId(sid)
                 .put(AgentSessionContext.class, session)
                 .build();
 
         log.info("━━━━━━━ Skill-Harness 启动 userId={}, sessionId={} ━━━━━━━",
-                USER_ID, SESSION_ID);
+                uid, sid);
 
         return skillHarnessAgent
                 .streamEvents(new UserMessage(trimmed), ctx)

@@ -45,19 +45,27 @@ public class A2aSqlHitlRunner {
     private final SqlQueryHitlAgentFactory hitlFactory;
     private final A2aSqlConfirmRegistry confirmRegistry;
     private final HostTraceRecorder traceRecorder;
+    private final org.example.nlp2dsl2sql.service.memory.SemanticSessionStore semanticSessionStore;
+    private final org.example.nlp2dsl2sql.service.memory.QueryContextRewriter queryContextRewriter;
 
     /**
-     * @param hitlFactory     HITL Agent 工厂
-     * @param confirmRegistry 挂起表
-     * @param traceRecorder   trace 内存记录器
+     * @param hitlFactory          HITL Agent 工厂
+     * @param confirmRegistry      挂起表
+     * @param traceRecorder        trace 内存记录器
+     * @param semanticSessionStore 会话语义存储
+     * @param queryContextRewriter 追问上下文改写器
      */
     public A2aSqlHitlRunner(
             SqlQueryHitlAgentFactory hitlFactory,
             A2aSqlConfirmRegistry confirmRegistry,
-            HostTraceRecorder traceRecorder) {
+            HostTraceRecorder traceRecorder,
+            org.example.nlp2dsl2sql.service.memory.SemanticSessionStore semanticSessionStore,
+            org.example.nlp2dsl2sql.service.memory.QueryContextRewriter queryContextRewriter) {
         this.hitlFactory = hitlFactory;
         this.confirmRegistry = confirmRegistry;
         this.traceRecorder = traceRecorder;
+        this.semanticSessionStore = semanticSessionStore;
+        this.queryContextRewriter = queryContextRewriter;
     }
 
     /**
@@ -70,11 +78,26 @@ public class A2aSqlHitlRunner {
      */
     public String run(
             String query, A2aHostChatContext hostCtx, long timeoutMs) {
+        String sid = hostCtx.getSessionId();
+        String uid = (hostCtx.getUserId() != null && !hostCtx.getUserId().isBlank())
+                ? hostCtx.getUserId()
+                : "user_" + (sid.length() > 8 ? sid.substring(0, 8) : sid);
+
+        org.example.nlp2dsl2sql.models.dto.dsl.SemanticSessionSnapshot lastSnapshot =
+                semanticSessionStore.get(sid);
+        String effectiveQuery = queryContextRewriter.rewriteIfNeeded(query, lastSnapshot);
+        if (effectiveQuery != null && !effectiveQuery.trim().equals(query.trim())) {
+            traceRecorder.step(sid, "query-rewrite", "from: " + query.trim() + " -> to: " + effectiveQuery.trim());
+            log.info("[Multi-Turn] 子查询改写: raw='{}' -> effective='{}'", query.trim(), effectiveQuery.trim());
+        } else {
+            effectiveQuery = query.trim();
+        }
+
         ReActAgent agent = hitlFactory.create();
         AgentSessionContext sqlSession = new AgentSessionContext();
         RuntimeContext sqlCtx = RuntimeContext.builder()
-                .userId("lsy")
-                .sessionId(hostCtx.getSessionId())
+                .userId(uid)
+                .sessionId(sid)
                 .put(AgentSessionContext.class, sqlSession)
                 .build();
 
@@ -86,7 +109,7 @@ public class A2aSqlHitlRunner {
 
         try {
             for (AgentEvent event : agent
-                    .streamEvents(new UserMessage(query.trim()), sqlCtx)
+                    .streamEvents(new UserMessage(effectiveQuery), sqlCtx)
                     .toIterable()) {
                 toolTracer.onEvent(event);
                 if (event instanceof RequireUserConfirmEvent confirm) {
@@ -115,6 +138,22 @@ public class A2aSqlHitlRunner {
             toolTracer.endAll();
             log.warn("[HITL] SQL Agent 流式执行失败: {}", e.getMessage());
             return "SQL Agent 调用失败: " + e.getMessage();
+        }
+
+        // 查询成功且生成了 DSL，沉淀会话语义快照以支持多轮继承
+        if (sqlSession.getDsl() != null) {
+            semanticSessionStore.put(sid, org.example.nlp2dsl2sql.models.dto.dsl.SemanticSessionSnapshot.builder()
+                    .question(query.trim())
+                    .effectiveQuestion(effectiveQuery)
+                    .intent(sqlSession.getIntent())
+                    .dsl(sqlSession.getDsl())
+                    .enrichedDsl(sqlSession.getEnrichedDsl())
+                    .sql(sqlSession.getSql())
+                    .queryResult(sqlSession.getQueryResult())
+                    .timestamp(java.time.Instant.now())
+                    .build());
+            log.info("[Multi-Turn] 已沉淀会话语义快照 sessionId={}, dslMetric={}",
+                    sid, sqlSession.getDsl().getMetric());
         }
 
         if (finalText.length() == 0) {

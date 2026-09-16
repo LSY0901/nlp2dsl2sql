@@ -22,14 +22,23 @@ class A2aSqlHitlRunnerWaitDecisionTest {
     @Mock
     private SqlQueryHitlAgentFactory hitlFactory;
 
+    @Mock
+    private org.example.nlp2dsl2sql.service.memory.QueryContextRewriter queryContextRewriter;
+
     private HostTraceRecorder traceRecorder;
+    private org.example.nlp2dsl2sql.service.memory.SemanticSessionStore semanticSessionStore;
     private A2aSqlHitlRunner runner;
 
     @BeforeEach
     void setUp() {
         traceRecorder = new HostTraceRecorder(new A2aHostTraceProperties());
+        semanticSessionStore = new org.example.nlp2dsl2sql.service.memory.SemanticSessionStore();
         runner = new A2aSqlHitlRunner(
-                hitlFactory, new A2aSqlConfirmRegistry(), traceRecorder);
+                hitlFactory,
+                new A2aSqlConfirmRegistry(),
+                traceRecorder,
+                semanticSessionStore,
+                queryContextRewriter);
     }
 
     @Test

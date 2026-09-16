@@ -16,4 +16,16 @@ public interface IAgentSkillWorkflowService {
      * @return SSE 文本流
      */
     Flux<String> run(String question);
+
+    /**
+     * 执行 Agent-Skill-Workflow 查询（带会话与租户身份）。
+     *
+     * @param sessionId 会话 ID
+     * @param userId    用户 ID
+     * @param question  用户自然语言问题
+     * @return SSE 文本流
+     */
+    default Flux<String> run(String sessionId, String userId, String question) {
+        return run(question);
+    }
 }

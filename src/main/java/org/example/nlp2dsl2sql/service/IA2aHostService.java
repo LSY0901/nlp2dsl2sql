@@ -22,6 +22,18 @@ public interface IA2aHostService {
     Flux<String> chat(String sessionId, String question);
 
     /**
+     * 启动 Host Agent，流式返回 SSE 文本（支持传入用户身份）。
+     *
+     * @param sessionId HITL 会话 ID，可空（服务端生成）
+     * @param userId    用户 ID，可空（自动绑定）
+     * @param question  用户问题
+     * @return 文本流
+     */
+    default Flux<String> chat(String sessionId, String userId, String question) {
+        return chat(sessionId, question);
+    }
+
+    /**
      * 确认或拒绝待执行 SQL。
      *
      * @param request 确认请求（以 rawInput 判定）

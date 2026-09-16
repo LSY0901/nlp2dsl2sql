@@ -19,26 +19,39 @@ import java.nio.file.Paths;
 public class A2aHostAgentFactory {
 
     private final A2aRemoteAgentTools tools;
+    private final DynamicRoutingChatModel dynamicModel;
     private final ObjectProvider<JsonlTraceMiddleware> traceMiddleware;
 
     /**
      * @param tools           A2A 远程 Agent 工具
+     * @param dynamicModel    动态分层路由模型代理
      * @param traceMiddleware JSONL trace 中间件（trace 关闭时不存在）
      */
     public A2aHostAgentFactory(
             A2aRemoteAgentTools tools,
+            DynamicRoutingChatModel dynamicModel,
             ObjectProvider<JsonlTraceMiddleware> traceMiddleware) {
         this.tools = tools;
+        this.dynamicModel = dynamicModel;
         this.traceMiddleware = traceMiddleware;
     }
 
     /**
-     * 创建 Host Agent。
+     * 创建基于动态路由模型的 Host Agent。
      *
-     * @param model 路由选出的模型
      * @return 名为 a2aHostAgent 的 HarnessAgent
      */
-    public HarnessAgent create(OpenAIChatModel model) {
+    public HarnessAgent create() {
+        return create(dynamicModel);
+    }
+
+    /**
+     * 创建指定模型的 Host Agent。
+     *
+     * @param model 目标模型
+     * @return 名为 a2aHostAgent 的 HarnessAgent
+     */
+    public HarnessAgent create(io.agentscope.core.model.Model model) {
         Toolkit toolkit = new Toolkit();
         toolkit.registerTool(tools);
 

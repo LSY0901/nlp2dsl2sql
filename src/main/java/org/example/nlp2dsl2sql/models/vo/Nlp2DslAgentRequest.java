@@ -13,4 +13,7 @@ public class Nlp2DslAgentRequest {
 
     /** A2A Host HITL 会话 ID（前端生成；缺失时服务端生成） */
     private String sessionId;
+
+    /** 用户 ID（可选；缺失时服务端自动绑定） */
+    private String userId;
 }

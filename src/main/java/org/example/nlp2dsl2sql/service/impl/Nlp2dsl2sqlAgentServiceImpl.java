@@ -49,21 +49,32 @@ public class Nlp2dsl2sqlAgentServiceImpl implements INlp2dsl2sqlAgentService {
      */
     @Override
     public Flux<String> nlp2dsl2sqlAgentQuery(String question) {
+        return nlp2dsl2sqlAgentQuery(null, null, question);
+    }
+
+    @Override
+    public Flux<String> nlp2dsl2sqlAgentQuery(String sessionId, String userId, String question) {
         if (question == null || question.isBlank()) {
             return Flux.just("错误: 问题不能为空");
         }
 
         String trimmed = question.trim();
+        String sid = (sessionId != null && !sessionId.isBlank())
+                ? sessionId.trim()
+                : java.util.UUID.randomUUID().toString();
+        String uid = (userId != null && !userId.isBlank())
+                ? userId.trim()
+                : "user_" + (sid.length() > 8 ? sid.substring(0, 8) : sid);
+
         AgentSessionContext session = new AgentSessionContext();
 
-        // userId / sessionId 写死；同会话多轮走 Harness Memory
         RuntimeContext ctx = RuntimeContext.builder()
-                .userId("lsy")
-                .sessionId("0901")
+                .userId(uid)
+                .sessionId(sid)
                 .put(AgentSessionContext.class, session)
                 .build();
 
-        log.info("━━━━━━━ HarnessAgent 流式 ReAct 启动 ━━━━━━━");
+        log.info("━━━━━━━ HarnessAgent 流式 ReAct 启动 sessionId={}, userId={} ━━━━━━━", sid, uid);
 
         return nlp2dsl2sqlAgentLatest
                 .streamEvents(new UserMessage(trimmed), ctx)

@@ -31,15 +31,25 @@ public class A2aHostSessionManager {
     }
 
     /**
+     * 获取或创建指定 sessionId 的 HarnessAgent 实例（底层绑定动态路由模型）。
+     *
+     * @param sessionId 会话 ID
+     * @return HarnessAgent 实例
+     */
+    public HarnessAgent getOrCreateAgent(String sessionId) {
+        return getOrCreateAgent(sessionId, null);
+    }
+
+    /**
      * 获取或创建指定 sessionId 的 HarnessAgent 实例。
      *
      * @param sessionId 会话 ID
-     * @param model     路由选出的模型
+     * @param model     路由选出的模型（兼容参数，底层统一走 DynamicRoutingChatModel）
      * @return HarnessAgent 实例
      */
     public HarnessAgent getOrCreateAgent(String sessionId, OpenAIChatModel model) {
         if (sessionId == null || sessionId.isBlank()) {
-            return hostAgentFactory.create(model);
+            return hostAgentFactory.create();
         }
 
         cleanExpiredSessions();
@@ -47,7 +57,7 @@ public class A2aHostSessionManager {
         SessionHolder holder = sessionCache.compute(sessionId, (key, existing) -> {
             if (existing == null) {
                 log.info("[SessionManager] 创建新 Host Agent 会话 sessionId={}", sessionId);
-                HarnessAgent newAgent = hostAgentFactory.create(model);
+                HarnessAgent newAgent = hostAgentFactory.create();
                 return new SessionHolder(newAgent);
             }
             existing.touch();

@@ -49,6 +49,9 @@ public class Nlp2Dsl2SqlAgentToolReActController {
      */
     @GetMapping(value = "/nlp2Dsl2SqlAgent", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> multiAgentChat(Nlp2DslAgentRequest request) {
-        return multiAgentService.nlp2dsl2sqlAgentQuery(request.getQuestion());
+        return multiAgentService.nlp2dsl2sqlAgentQuery(
+                request.getSessionId(),
+                request.getUserId(),
+                request.getQuestion());
     }
 }

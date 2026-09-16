@@ -45,7 +45,9 @@ public class A2aHostController {
     @GetMapping(value = "/a2aHost", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> a2aHost(Nlp2DslAgentRequest request) {
         return a2aHostService.chat(
-                request.getSessionId(), request.getQuestion());
+                request.getSessionId(),
+                request.getUserId(),
+                request.getQuestion());
     }
 
     /**

@@ -39,6 +39,9 @@ public class Nlp2Dsl2SqlAgentSkillWorkflowController {
     @GetMapping(value = "/nlp2Dsl2SqlAgentSkillWorkflow",
             produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> agentSkillWorkflowChat(Nlp2DslAgentRequest request) {
-        return agentSkillWorkflowService.run(request.getQuestion());
+        return agentSkillWorkflowService.run(
+                request.getSessionId(),
+                request.getUserId(),
+                request.getQuestion());
     }
 }

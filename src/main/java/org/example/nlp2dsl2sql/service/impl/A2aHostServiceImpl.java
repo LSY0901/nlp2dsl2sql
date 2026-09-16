@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.nlp2dsl2sql.a2a.A2aHostSessionManager;
 import org.example.nlp2dsl2sql.a2a.A2aHostChatContext;
 import org.example.nlp2dsl2sql.a2a.A2aHostModelRouter;
+import org.example.nlp2dsl2sql.a2a.DynamicRoutingChatModel;
 import org.example.nlp2dsl2sql.a2a.A2aSqlConfirmRegistry;
 import org.example.nlp2dsl2sql.a2a.A2aSqlConfirmTexts;
 import org.example.nlp2dsl2sql.a2a.trace.AgentEventToolTracer;
@@ -41,6 +42,7 @@ public class A2aHostServiceImpl implements IA2aHostService {
     private final A2aHostModelRouter modelRouter;
     private final A2aSqlConfirmRegistry confirmRegistry;
     private final HostTraceRecorder traceRecorder;
+    private final DynamicRoutingChatModel dynamicModel;
 
     /**
      * 构造 A2A Host 服务。
@@ -49,16 +51,19 @@ public class A2aHostServiceImpl implements IA2aHostService {
      * @param modelRouter      模型路由器
      * @param confirmRegistry  SQL 确认挂起表
      * @param traceRecorder    trace 内存记录器
+     * @param dynamicModel     动态路由模型代理
      */
     public A2aHostServiceImpl(
             A2aHostSessionManager sessionManager,
             A2aHostModelRouter modelRouter,
             A2aSqlConfirmRegistry confirmRegistry,
-            HostTraceRecorder traceRecorder) {
+            HostTraceRecorder traceRecorder,
+            DynamicRoutingChatModel dynamicModel) {
         this.sessionManager = sessionManager;
         this.modelRouter = modelRouter;
         this.confirmRegistry = confirmRegistry;
         this.traceRecorder = traceRecorder;
+        this.dynamicModel = dynamicModel;
     }
 
     /**
@@ -70,6 +75,19 @@ public class A2aHostServiceImpl implements IA2aHostService {
      */
     @Override
     public Flux<String> chat(String sessionId, String question) {
+        return chat(sessionId, null, question);
+    }
+
+    /**
+     * 启动 Host Agent，合并 Agent 事件流与 HITL SSE 桥（带租户/用户身份）。
+     *
+     * @param sessionId 会话 ID
+     * @param userId    用户 ID（可选）
+     * @param question  用户问题
+     * @return SSE 文本增量流
+     */
+    @Override
+    public Flux<String> chat(String sessionId, String userId, String question) {
         if (question == null || question.isBlank()) {
             return Flux.just("错误: 问题不能为空");
         }
@@ -78,16 +96,21 @@ public class A2aHostServiceImpl implements IA2aHostService {
         String sid = (sessionId == null || sessionId.isBlank())
                 ? UUID.randomUUID().toString()
                 : sessionId.trim();
-        A2aHostChatContext hostCtx = new A2aHostChatContext(sid);
+        String uid = (userId != null && !userId.isBlank())
+                ? userId.trim()
+                : "user_" + (sid.length() > 8 ? sid.substring(0, 8) : sid);
+
+        A2aHostChatContext hostCtx = new A2aHostChatContext(sid, uid);
         traceRecorder.start(sid, trimmed);
 
         A2aHostModelRouter.ModelRoute route = modelRouter.route(trimmed);
         OpenAIChatModel model = route.model();
         traceRecorder.recordModel(sid, route.tier(), model.getModelName());
+        dynamicModel.bindSessionModel(sid, model);
         HarnessAgent hostAgent = sessionManager.getOrCreateAgent(sid, model);
 
         RuntimeContext ctx = RuntimeContext.builder()
-                .userId("lsy")
+                .userId(uid)
                 .sessionId(sid)
                 .put(A2aHostChatContext.class, hostCtx)
                 .build();
@@ -95,8 +118,8 @@ public class A2aHostServiceImpl implements IA2aHostService {
         AgentEventToolTracer hostTracer =
                 new AgentEventToolTracer(traceRecorder, sid, "host");
 
-        log.info("━━━━━━━ A2A Host 启动 ━━━━━━━ sessionId={}, tier={}, model={}, question={}",
-                sid, route.tier(), model.getModelName(), trimmed);
+        log.info("━━━━━━━ A2A Host 启动 ━━━━━━━ sessionId={}, userId={}, tier={}, model={}, question={}",
+                sid, uid, route.tier(), model.getModelName(), trimmed);
 
         HostTraceRecorder.TimedStep loopTimer =
                 traceRecorder.timedStep(sid, "host-loop", null);
@@ -134,6 +157,7 @@ public class A2aHostServiceImpl implements IA2aHostService {
                             HostTraceRecord.STATUS_FAILED, e.getMessage());
                 })
                 .doFinally(signal -> {
+                    dynamicModel.unbindSessionModel(sid);
                     if (signal == SignalType.ON_COMPLETE) {
                         traceRecorder.finish(sid,
                                 HostTraceRecord.STATUS_COMPLETED);
@@ -143,7 +167,10 @@ public class A2aHostServiceImpl implements IA2aHostService {
                                 "signal=" + signal);
                     }
                 })
-                .onErrorResume(e -> Flux.just("错误: " + e.getMessage()));
+                .onErrorResume(e -> Flux.just("错误: " + e.getMessage()))
+                .contextWrite(reactor.util.context.Context.of(
+                        DynamicRoutingChatModel.ROUTED_MODEL_KEY, model,
+                        DynamicRoutingChatModel.SESSION_ID_KEY, sid));
     }
 
     /**

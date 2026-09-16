@@ -33,4 +33,16 @@ public interface INlp2dsl2sqlAgentService {
      * @return SSE 流式响应
      */
     Flux<String> nlp2dsl2sqlAgentQuery(String question);
+
+    /**
+     * 多 Agent 协作查询（带 sessionId 和 userId）。
+     *
+     * @param sessionId 会话 ID
+     * @param userId    用户 ID
+     * @param question  用户自然语言问题
+     * @return SSE 流式响应
+     */
+    default Flux<String> nlp2dsl2sqlAgentQuery(String sessionId, String userId, String question) {
+        return nlp2dsl2sqlAgentQuery(question);
+    }
 }

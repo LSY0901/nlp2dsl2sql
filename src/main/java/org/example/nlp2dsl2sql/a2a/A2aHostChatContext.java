@@ -10,6 +10,7 @@ import reactor.core.publisher.Sinks;
 public class A2aHostChatContext {
 
     private final String sessionId;
+    private final String userId;
     private final Sinks.Many<String> sseSink;
 
     /**
@@ -18,7 +19,18 @@ public class A2aHostChatContext {
      * @param sessionId 会话 ID
      */
     public A2aHostChatContext(String sessionId) {
+        this(sessionId, null);
+    }
+
+    /**
+     * 构造 Host 聊天上下文。
+     *
+     * @param sessionId 会话 ID
+     * @param userId    用户 ID
+     */
+    public A2aHostChatContext(String sessionId, String userId) {
         this.sessionId = sessionId;
+        this.userId = userId;
         this.sseSink = Sinks.many().multicast().onBackpressureBuffer();
     }
 
