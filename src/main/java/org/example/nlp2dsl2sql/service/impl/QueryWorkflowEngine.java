@@ -91,24 +91,6 @@ public class QueryWorkflowEngine implements IQueryWorkflowEngine {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
-    public Flux<String> run1(String question) {
-        if (question == null || question.isBlank()) {
-            return Flux.just("错误: 问题不能为空");
-        }
-        String trimmed = question.trim();
-        return Flux.defer(() -> {
-            try {
-                return executeWorkflow(trimmed);
-            } catch (Nlp2dsl2sqlException e) {
-                log.warn("Workflow 业务失败: {}", e.getMessage());
-                return Flux.just("错误: " + e.getMessage());
-            } catch (Exception e) {
-                log.error("Workflow 执行失败", e);
-                return Flux.just("错误: 系统处理失败，请稍后重试");
-            }
-        }).subscribeOn(Schedulers.boundedElastic());
-    }
-
 
     /**
      * 执行规划 → 调度 →（可选）重规划循环。
