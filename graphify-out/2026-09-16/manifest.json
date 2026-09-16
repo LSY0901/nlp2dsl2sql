@@ -594,9 +594,9 @@
     "semantic_hash": "a8fb12d049567bce6700f2cf73355ba9"
   },
   "src/main/java/org/example/nlp2dsl2sql/service/impl/QueryWorkflowEngine.java": {
-    "mtime": 1789545470.094325,
-    "seen": 1789545628.0373764,
-    "ast_hash": "e1b06a5f6334166c70b28d030361a81c",
+    "mtime": 1789546243.2185044,
+    "seen": 1789546288.7440212,
+    "ast_hash": "2d74115cb8269e2fa179901001ef68f4",
     "semantic_hash": ""
   },
   "src/main/java/org/example/nlp2dsl2sql/service/impl/SemanticDslAgentServiceImpl.java": {
@@ -969,6 +969,12 @@
     "mtime": 1786070733.324355,
     "seen": 1789545628.0413766,
     "ast_hash": "42f01434888104242ac4e07fcce11dc2",
+    "semantic_hash": ""
+  },
+  "ai_agent.sql": {
+    "mtime": 1784863423.5985599,
+    "seen": 1789546288.7440212,
+    "ast_hash": "0a51665e9cb738fb07dc99b29dcf0fb0",
     "semantic_hash": ""
   }
 }

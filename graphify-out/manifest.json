@@ -42,16 +42,16 @@
     "semantic_hash": "7cbdadc6ba61c18511b66ad0f7f53ecf"
   },
   "src/main/java/org/example/nlp2dsl2sql/a2a/A2aHostAgentFactory.java": {
-    "mtime": 1786003729.7108681,
-    "seen": 1789544474.690082,
-    "ast_hash": "684b5305e40e89f36d4a0f5d0bd0eb52",
-    "semantic_hash": "684b5305e40e89f36d4a0f5d0bd0eb52"
+    "mtime": 1789551784.4181533,
+    "seen": 1789552357.8819737,
+    "ast_hash": "4f160d74bed14e533d35257bae37b8dc",
+    "semantic_hash": ""
   },
   "src/main/java/org/example/nlp2dsl2sql/a2a/A2aHostChatContext.java": {
-    "mtime": 1785403185.066602,
-    "seen": 1789544474.690082,
-    "ast_hash": "50482a2747da4de6e867ef1aa228b862",
-    "semantic_hash": "50482a2747da4de6e867ef1aa228b862"
+    "mtime": 1789551812.3451266,
+    "seen": 1789552357.8819737,
+    "ast_hash": "03555673916fc479c65021a3ae7cdf38",
+    "semantic_hash": ""
   },
   "src/main/java/org/example/nlp2dsl2sql/a2a/A2aHostModelRouter.java": {
     "mtime": 1785998317.602409,
@@ -60,16 +60,16 @@
     "semantic_hash": "86f55da9421a1218fd7067b44d073240"
   },
   "src/main/java/org/example/nlp2dsl2sql/a2a/A2aHostPrompt.java": {
-    "mtime": 1786067949.6567607,
-    "seen": 1789544474.690082,
-    "ast_hash": "9a8175c15043ac8b94e5dafbf32aa401",
-    "semantic_hash": "9a8175c15043ac8b94e5dafbf32aa401"
+    "mtime": 1789551804.0363286,
+    "seen": 1789552357.8819737,
+    "ast_hash": "a553005da65460f99e5b0320dd5e4337",
+    "semantic_hash": ""
   },
   "src/main/java/org/example/nlp2dsl2sql/a2a/A2aHostSessionManager.java": {
-    "mtime": 1786067949.6567607,
-    "seen": 1789544474.690082,
-    "ast_hash": "e2ffb2fe4d837720e60a6d2686c459cc",
-    "semantic_hash": "e2ffb2fe4d837720e60a6d2686c459cc"
+    "mtime": 1789551793.195895,
+    "seen": 1789552357.8819737,
+    "ast_hash": "245635d0bcaa9d129a26bb970700543f",
+    "semantic_hash": ""
   },
   "src/main/java/org/example/nlp2dsl2sql/a2a/A2aMsgTexts.java": {
     "mtime": 1785133056.0689695,
@@ -96,10 +96,10 @@
     "semantic_hash": "4e4c2e32b79b6d04ce3a4670f9d32093"
   },
   "src/main/java/org/example/nlp2dsl2sql/a2a/A2aSqlHitlRunner.java": {
-    "mtime": 1789380115.101483,
-    "seen": 1789544474.690082,
-    "ast_hash": "7f5658e060bac4fe504088b20a3ff95a",
-    "semantic_hash": "7f5658e060bac4fe504088b20a3ff95a"
+    "mtime": 1789551870.4284906,
+    "seen": 1789552357.8819737,
+    "ast_hash": "c666bce48e569e8c1075684e788acd27",
+    "semantic_hash": ""
   },
   "src/main/java/org/example/nlp2dsl2sql/a2a/PendingSqlConfirm.java": {
     "mtime": 1785403190.3266246,
@@ -210,22 +210,22 @@
     "semantic_hash": "9bf1b746ea63eac7a2ea5c41ee4a2296"
   },
   "src/main/java/org/example/nlp2dsl2sql/controller/A2aHostController.java": {
-    "mtime": 1785998467.4699337,
-    "seen": 1789544474.690082,
-    "ast_hash": "941d814bb262ffe58ab89be4aea39ab6",
-    "semantic_hash": "941d814bb262ffe58ab89be4aea39ab6"
+    "mtime": 1789551856.0918941,
+    "seen": 1789552357.8819737,
+    "ast_hash": "b6940fa9d853e06de238e23617f1fda3",
+    "semantic_hash": ""
   },
   "src/main/java/org/example/nlp2dsl2sql/controller/Nlp2Dsl2SqlAgentSkillWorkflowController.java": {
-    "mtime": 1784880498.7553513,
-    "seen": 1789544474.690082,
-    "ast_hash": "eaa4d3cea9d9a5876dfa6fe2325de995",
-    "semantic_hash": "eaa4d3cea9d9a5876dfa6fe2325de995"
+    "mtime": 1789551919.128723,
+    "seen": 1789552357.8819737,
+    "ast_hash": "7c3cbdb06356a40ace8f101f8a9f2b05",
+    "semantic_hash": ""
   },
   "src/main/java/org/example/nlp2dsl2sql/controller/Nlp2Dsl2SqlAgentToolReActController.java": {
-    "mtime": 1784880451.4715948,
-    "seen": 1789544474.690082,
-    "ast_hash": "1b381adc06623973b8a7e4298fbb233e",
-    "semantic_hash": "1b381adc06623973b8a7e4298fbb233e"
+    "mtime": 1789551893.8636384,
+    "seen": 1789552357.8819737,
+    "ast_hash": "5748764bb090a8f9a68dd7fe24e2b471",
+    "semantic_hash": ""
   },
   "src/main/java/org/example/nlp2dsl2sql/controller/Nlp2Dsl2SqlAgentWorkFlowController.java": {
     "mtime": 1784863423.6112351,
@@ -468,10 +468,10 @@
     "semantic_hash": "f7bc1511ec802e8630857fc5b1d5cf59"
   },
   "src/main/java/org/example/nlp2dsl2sql/models/vo/Nlp2DslAgentRequest.java": {
-    "mtime": 1785403191.1894956,
-    "seen": 1789544474.690082,
-    "ast_hash": "7b7a870575bb5cb826de4daf274e7131",
-    "semantic_hash": "7b7a870575bb5cb826de4daf274e7131"
+    "mtime": 1789551818.1543863,
+    "seen": 1789552357.8819737,
+    "ast_hash": "3c8b5451768584896b3665c3504426a5",
+    "semantic_hash": ""
   },
   "src/main/java/org/example/nlp2dsl2sql/planner/IQueryPlanner.java": {
     "mtime": 1784863423.6334212,
@@ -546,22 +546,22 @@
     "semantic_hash": "8d63c97fe022a6ec603d4e72222f500d"
   },
   "src/main/java/org/example/nlp2dsl2sql/service/IA2aHostService.java": {
-    "mtime": 1785998382.4894607,
-    "seen": 1789544474.690082,
-    "ast_hash": "adabff8a8281e7e1f4899bc105f6c754",
-    "semantic_hash": "adabff8a8281e7e1f4899bc105f6c754"
+    "mtime": 1789551824.8815823,
+    "seen": 1789552357.8825734,
+    "ast_hash": "3979c182018d2ae33e652834a8797e4e",
+    "semantic_hash": ""
   },
   "src/main/java/org/example/nlp2dsl2sql/service/IAgentSkillWorkflowService.java": {
-    "mtime": 1784880491.9372995,
-    "seen": 1789544474.690082,
-    "ast_hash": "5a4d4eef608a1d5603df147bb90c93c6",
-    "semantic_hash": "5a4d4eef608a1d5603df147bb90c93c6"
+    "mtime": 1789551900.401342,
+    "seen": 1789552357.8825734,
+    "ast_hash": "4bd6d2868e8d65067fbb204271fdc935",
+    "semantic_hash": ""
   },
   "src/main/java/org/example/nlp2dsl2sql/service/INlp2dsl2sqlAgentService.java": {
-    "mtime": 1784880456.19029,
-    "seen": 1789544474.690082,
-    "ast_hash": "23f8c660049b8ca19bc7f797ffb43200",
-    "semantic_hash": "23f8c660049b8ca19bc7f797ffb43200"
+    "mtime": 1789551878.9101198,
+    "seen": 1789552357.8825734,
+    "ast_hash": "c8f054bc4709f0cfd596cc954f53d3cd",
+    "semantic_hash": ""
   },
   "src/main/java/org/example/nlp2dsl2sql/service/IQueryWorkflowEngine.java": {
     "mtime": 1784863423.639513,
@@ -576,22 +576,22 @@
     "semantic_hash": "e96bd782f310ba73f943850fdf35da27"
   },
   "src/main/java/org/example/nlp2dsl2sql/service/impl/A2aHostServiceImpl.java": {
-    "mtime": 1789380115.1054833,
-    "seen": 1789544474.690082,
-    "ast_hash": "5582e4984885c47986c168761be2bf7d",
-    "semantic_hash": "5582e4984885c47986c168761be2bf7d"
+    "mtime": 1789551965.3744857,
+    "seen": 1789552357.8825734,
+    "ast_hash": "f1cb089a5447be0501ba4ce2b3d27b6f",
+    "semantic_hash": ""
   },
   "src/main/java/org/example/nlp2dsl2sql/service/impl/AgentSkillWorkflowServiceImpl.java": {
-    "mtime": 1784881002.0750563,
-    "seen": 1789544474.690082,
-    "ast_hash": "38773d0f72b3de4eea3fdd135c691d6f",
-    "semantic_hash": "38773d0f72b3de4eea3fdd135c691d6f"
+    "mtime": 1789551909.484855,
+    "seen": 1789552357.8825734,
+    "ast_hash": "473640bdbe32472b03ad9afa56756c8b",
+    "semantic_hash": ""
   },
   "src/main/java/org/example/nlp2dsl2sql/service/impl/Nlp2dsl2sqlAgentServiceImpl.java": {
-    "mtime": 1784880457.625116,
-    "seen": 1789544474.690082,
-    "ast_hash": "a8fb12d049567bce6700f2cf73355ba9",
-    "semantic_hash": "a8fb12d049567bce6700f2cf73355ba9"
+    "mtime": 1789551887.2877054,
+    "seen": 1789552357.8825734,
+    "ast_hash": "75c17b21c34066823cbb1cc60436a843",
+    "semantic_hash": ""
   },
   "src/main/java/org/example/nlp2dsl2sql/service/impl/QueryWorkflowEngine.java": {
     "mtime": 1789546243.2185044,
@@ -780,10 +780,10 @@
     "semantic_hash": "9f464392cc25e5c2427928c28d158c0c"
   },
   "src/test/java/org/example/nlp2dsl2sql/a2a/A2aSqlHitlRunnerWaitDecisionTest.java": {
-    "mtime": 1789380115.1134899,
-    "seen": 1789544474.690082,
-    "ast_hash": "a9c3c8f75bcb5c4f4be0ab5035683ec3",
-    "semantic_hash": "a9c3c8f75bcb5c4f4be0ab5035683ec3"
+    "mtime": 1789551940.1135197,
+    "seen": 1789552357.8825734,
+    "ast_hash": "6e1d4c2dd342b854aea3810cab0fc71a",
+    "semantic_hash": ""
   },
   "src/test/java/org/example/nlp2dsl2sql/a2a/trace/HostTraceRecorderTest.java": {
     "mtime": 1789380115.1134899,
@@ -975,6 +975,30 @@
     "mtime": 1784863423.5985599,
     "seen": 1789546288.7440212,
     "ast_hash": "0a51665e9cb738fb07dc99b29dcf0fb0",
+    "semantic_hash": ""
+  },
+  "src/main/java/org/example/nlp2dsl2sql/a2a/DynamicRoutingChatModel.java": {
+    "mtime": 1789551776.7538447,
+    "seen": 1789552357.8819737,
+    "ast_hash": "17c50ff581db612f8a02b86f1b83b905",
+    "semantic_hash": ""
+  },
+  "src/main/java/org/example/nlp2dsl2sql/models/dto/dsl/SemanticSessionSnapshot.java": {
+    "mtime": 1789551754.2238445,
+    "seen": 1789552357.8819737,
+    "ast_hash": "051729c41ece9d0f1816909eaa9efbd3",
+    "semantic_hash": ""
+  },
+  "src/main/java/org/example/nlp2dsl2sql/service/memory/QueryContextRewriter.java": {
+    "mtime": 1789551995.6414938,
+    "seen": 1789552357.8825734,
+    "ast_hash": "91de7cc87292fe0b26b79999530ebfc3",
+    "semantic_hash": ""
+  },
+  "src/main/java/org/example/nlp2dsl2sql/service/memory/SemanticSessionStore.java": {
+    "mtime": 1789551763.9264567,
+    "seen": 1789552357.8825734,
+    "ast_hash": "165d70531d434155457441b81451e49c",
     "semantic_hash": ""
   }
 }
