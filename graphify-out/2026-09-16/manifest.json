@@ -594,10 +594,10 @@
     "semantic_hash": "a8fb12d049567bce6700f2cf73355ba9"
   },
   "src/main/java/org/example/nlp2dsl2sql/service/impl/QueryWorkflowEngine.java": {
-    "mtime": 1784863423.6419697,
-    "seen": 1789544474.690082,
-    "ast_hash": "af80528fd851dd909f76691a46fae0e9",
-    "semantic_hash": "af80528fd851dd909f76691a46fae0e9"
+    "mtime": 1789545470.094325,
+    "seen": 1789545628.0373764,
+    "ast_hash": "e1b06a5f6334166c70b28d030361a81c",
+    "semantic_hash": ""
   },
   "src/main/java/org/example/nlp2dsl2sql/service/impl/SemanticDslAgentServiceImpl.java": {
     "mtime": 1788227901.479641,
@@ -808,5 +808,167 @@
     "seen": 1789544474.690082,
     "ast_hash": "e9a2639ffac04c0bcc3ee0b56a7cc838",
     "semantic_hash": "e9a2639ffac04c0bcc3ee0b56a7cc838"
+  },
+  ".tools/apache-maven-3.9.6/README.txt": {
+    "mtime": 1701136794.0,
+    "seen": 1789545628.0413766,
+    "ast_hash": "6245a5f6d26a04f946b0c6c4e17affb7",
+    "semantic_hash": ""
+  },
+  ".tools/apache-maven-3.9.6/lib/ext/README.txt": {
+    "mtime": 1701136794.0,
+    "seen": 1789545628.0413766,
+    "ast_hash": "0182ce445fc8a6c791947c664363c203",
+    "semantic_hash": ""
+  },
+  ".tools/apache-maven-3.9.6/lib/ext/hazelcast/README.txt": {
+    "mtime": 1701136794.0,
+    "seen": 1789545628.0413766,
+    "ast_hash": "68b291328747c3e9619dcb30099d07f1",
+    "semantic_hash": ""
+  },
+  ".tools/apache-maven-3.9.6/lib/ext/redisson/README.txt": {
+    "mtime": 1701136794.0,
+    "seen": 1789545628.0413766,
+    "ast_hash": "25d16b6329f9efd437154f67365cca59",
+    "semantic_hash": ""
+  },
+  ".tools/apache-maven-3.9.6/lib/jansi-native/README.txt": {
+    "mtime": 1701136794.0,
+    "seen": 1789545628.0413766,
+    "ast_hash": "0acfccc1252e8341880518ad1e4f9ba8",
+    "semantic_hash": ""
+  },
+  "AGENTS.md": {
+    "mtime": 1789380115.0944831,
+    "seen": 1789545628.0413766,
+    "ast_hash": "aff571af1cf14364ff0531f4180f5dbd",
+    "semantic_hash": ""
+  },
+  "docs/MULTI_AGENT_DESIGN.md": {
+    "mtime": 1784863423.600612,
+    "seen": 1789545628.0413766,
+    "ast_hash": "dde0af1ffa6c864643a621cc2f9037a0",
+    "semantic_hash": ""
+  },
+  "docs/a2a-workflow.html": {
+    "mtime": 1789380115.098477,
+    "seen": 1789545628.0413766,
+    "ast_hash": "c1275e23ec2803ba4202157a4dab6a9d",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/plans/2026-07-22-planner-workflow-service.md": {
+    "mtime": 1784863423.6016912,
+    "seen": 1789545628.0413766,
+    "ast_hash": "441804b245026f8644b2b8fca12f9b90",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/plans/2026-07-24-agent-skill-workflow.md": {
+    "mtime": 1784876528.091142,
+    "seen": 1789545628.0413766,
+    "ast_hash": "ae55768a8b4ead14961dc697515605d7",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/plans/2026-07-24-harness-skill-toolgroup.md": {
+    "mtime": 1784880023.538879,
+    "seen": 1789545628.0413766,
+    "ast_hash": "9b6c5353a8e679a25f2c48a759852b6e",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/plans/2026-07-27-a2a-agentscope-host.md": {
+    "mtime": 1785133056.063143,
+    "seen": 1789545628.0413766,
+    "ast_hash": "1118ab1156d060178615361b0438ead2",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/plans/2026-07-27-a2a-host-frontend-mode-switch.md": {
+    "mtime": 1785202364.258297,
+    "seen": 1789545628.0413766,
+    "ast_hash": "b1e806ef220515e092a3a1ca695d8c56",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/plans/2026-07-27-rule-first-intent.md": {
+    "mtime": 1785133845.2210968,
+    "seen": 1789545628.0413766,
+    "ast_hash": "3fb34e4c021f654617e335e988b5c416",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/plans/2026-07-30-a2a-host-sql-hitl.md": {
+    "mtime": 1785403161.4727976,
+    "seen": 1789545628.0413766,
+    "ast_hash": "ec7d46ffcb210fc9b5c5711a76c8a92f",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/specs/2026-07-22-planner-workflow-service-design.md": {
+    "mtime": 1784863423.6016912,
+    "seen": 1789545628.0413766,
+    "ast_hash": "b5fc13482fb0ccb2e4cca341bd589ac3",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/specs/2026-07-24-agent-skill-workflow-design.md": {
+    "mtime": 1784880118.2484355,
+    "seen": 1789545628.0413766,
+    "ast_hash": "4c48f50b781e2dcd102f197c3f2acd8f",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/specs/2026-07-27-a2a-agentscope-host-design.md": {
+    "mtime": 1785133056.063143,
+    "seen": 1789545628.0413766,
+    "ast_hash": "ec36c402fa369ac597a199f7e1ca0d5b",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/specs/2026-07-27-a2a-host-frontend-mode-switch-design.md": {
+    "mtime": 1785202364.258297,
+    "seen": 1789545628.0413766,
+    "ast_hash": "19f4651ead292d2f13c717c73ecc2532",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/specs/2026-07-27-a2a-sop-agent-checklist.md": {
+    "mtime": 1785133056.0646448,
+    "seen": 1789545628.0413766,
+    "ast_hash": "74a139d507be8d2d1b70972e1bc068fb",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/specs/2026-07-27-rule-first-intent-design.md": {
+    "mtime": 1785133845.2210968,
+    "seen": 1789545628.0413766,
+    "ast_hash": "68439baff2f7db37e50d287776bf96c6",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/specs/2026-07-30-a2a-host-sql-hitl-design.md": {
+    "mtime": 1785403161.4697132,
+    "seen": 1789545628.0413766,
+    "ast_hash": "74dbd63cbda9cb71fe676ac598365cfa",
+    "semantic_hash": ""
+  },
+  "src/main/resources/application.yaml": {
+    "mtime": 1786071319.9299371,
+    "seen": 1789545628.0413766,
+    "ast_hash": "68336c4fc604625afab9818453db7458",
+    "semantic_hash": ""
+  },
+  "src/main/resources/skills/chitchat/SKILL.md": {
+    "mtime": 1784880032.5998178,
+    "seen": 1789545628.0413766,
+    "ast_hash": "0a6910eed994185eb565ae3bcced2533",
+    "semantic_hash": ""
+  },
+  "src/main/resources/skills/nlp2sql-query/SKILL.md": {
+    "mtime": 1785134509.1038837,
+    "seen": 1789545628.0413766,
+    "ast_hash": "e670e64d4529a9c26156bf9a0ff0066f",
+    "semantic_hash": ""
+  },
+  "src/main/resources/static/a2a-workflow.html": {
+    "mtime": 1789380115.1089842,
+    "seen": 1789545628.0413766,
+    "ast_hash": "c1275e23ec2803ba4202157a4dab6a9d",
+    "semantic_hash": ""
+  },
+  "src/main/resources/static/nlp2dsl2sqlV2.html": {
+    "mtime": 1786070733.324355,
+    "seen": 1789545628.0413766,
+    "ast_hash": "42f01434888104242ac4e07fcce11dc2",
+    "semantic_hash": ""
   }
 }
