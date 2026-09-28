@@ -22,6 +22,7 @@ public class Nlp2Dsl2SqlAgentWorkFlowController {
      */
     @GetMapping(value = "/nlp2Dsl2SqlAgentV2", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> nlp2Dsl2SqlAgentV2(Nlp2DslAgentRequest request) {
-        return semanticDslAgentService.nlp2Dsl2SqlAgentV2(request.getQuestion());
+        return semanticDslAgentService.nlp2Dsl2SqlAgentV2(
+                request.getSessionId(), request.getQuestion());
     }
 }

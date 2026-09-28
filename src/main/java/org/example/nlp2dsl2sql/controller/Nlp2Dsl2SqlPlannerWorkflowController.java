@@ -39,6 +39,6 @@ public class Nlp2Dsl2SqlPlannerWorkflowController {
     @GetMapping(value = "/nlp2Dsl2SqlPlannerWorkflow",
             produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> plannerWorkflowChat(Nlp2DslAgentRequest request) {
-        return queryWorkflowEngine.run(request.getQuestion());
+        return queryWorkflowEngine.run(request.getSessionId(), request.getQuestion());
     }
 }

@@ -22,11 +22,16 @@ import java.util.regex.Pattern;
 @Component
 public class QueryContextRewriter {
 
-    /** 引导性追问词前缀/包含正则 */
+    /**
+     * 追问/省略特征词：代词开头、替换下钻动词、对比省略尾。
+     * <p>
+     * 只收真正无法独立成句的表达。像"按""其他""最高""最低"这类本身就是完整
+     * 问句起手的词不列入，避免为自包含问句白花一次 Fast LLM 调用。
+     */
     private static final Pattern ELLIPSIS_PATTERN = Pattern.compile(
-            "^(那|这个|这些|其|按|换成|如果换成|改为|只要|只看|排除|相比|同上|同理|其他|倒数|最高|最低)|(呢[？?]?$)|(的话[？?]?$)");
-
-    private static final int SHORT_QUERY_LENGTH = 12;
+            "^(那|这个|这些|那些|其中|换成|改成|如果换成|改为|只要|只看|除了|排除|相比|同上|同理)"
+                    + "|(呢[？?]?$)"
+                    + "|(的话[？?]?$)");
 
     private final A2aHostModelRouter modelRouter;
 
@@ -50,7 +55,7 @@ public class QueryContextRewriter {
         }
 
         String trimmed = currentQuery.trim();
-        if (!shouldRewrite(trimmed, previousSnapshot)) {
+        if (!shouldRewrite(trimmed)) {
             log.debug("[Rewriter] 判定为独立完整查询，无需改写: {}", trimmed);
             return trimmed;
         }
@@ -69,19 +74,16 @@ public class QueryContextRewriter {
     }
 
     /**
-     * 规则预检：判断是否符合追问/省略特征
+     * 规则预检：判断是否符合追问/省略特征。
+     * <p>
+     * 纯词表判定，不看长度——短问句完全可以是自包含的（"三年级多少人"），
+     * 长度启发式会把这类问句误送去改写。
+     *
+     * @param query 当前问句
+     * @return 命中追问/省略特征返回 true
      */
-    private boolean shouldRewrite(String query, SemanticSessionSnapshot snapshot) {
-        if (query.length() <= SHORT_QUERY_LENGTH) {
-            return true;
-        }
-        if (ELLIPSIS_PATTERN.matcher(query).find()) {
-            return true;
-        }
-        if (query.contains("那") || query.contains("换成") || query.contains("只看") || query.contains("排除")) {
-            return true;
-        }
-        return false;
+    private boolean shouldRewrite(String query) {
+        return ELLIPSIS_PATTERN.matcher(query).find();
     }
 
     /**

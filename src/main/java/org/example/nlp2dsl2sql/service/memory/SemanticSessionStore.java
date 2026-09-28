@@ -1,6 +1,7 @@
 package org.example.nlp2dsl2sql.service.memory;
 
 import lombok.extern.slf4j.Slf4j;
+import org.example.nlp2dsl2sql.config.MemoryProperties;
 import org.example.nlp2dsl2sql.models.dto.dsl.SemanticSessionSnapshot;
 import org.springframework.stereotype.Component;
 
@@ -12,16 +13,19 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * 进程内轻量级会话语义存储：维护每个 sessionId 的多轮问数语义快照。
  * <p>
- * 默认 30 分钟闲置过期自动清理。
+ * 闲置过期时间由 {@code memory.session-ttl} 配置。
  */
 @Slf4j
 @Component
 public class SemanticSessionStore {
 
-    /** 默认会话语义快照过期时间：30 分钟 */
-    private static final Duration DEFAULT_TTL = Duration.ofMinutes(30);
+    private final MemoryProperties memoryProperties;
 
     private final Map<String, StoreEntry> cache = new ConcurrentHashMap<>();
+
+    public SemanticSessionStore(MemoryProperties memoryProperties) {
+        this.memoryProperties = memoryProperties;
+    }
 
     /**
      * 获取指定会话的最近一次语义快照。
@@ -81,9 +85,13 @@ public class SemanticSessionStore {
      * 清理过期闲置条目。
      */
     private void cleanExpired() {
+        Duration ttl = memoryProperties.getSessionTtl();
+        if (ttl == null || ttl.isZero() || ttl.isNegative()) {
+            return;
+        }
         Instant now = Instant.now();
         cache.entrySet().removeIf(e -> {
-            boolean expired = Duration.between(e.getValue().lastAccessTime, now).compareTo(DEFAULT_TTL) > 0;
+            boolean expired = Duration.between(e.getValue().lastAccessTime, now).compareTo(ttl) > 0;
             if (expired) {
                 log.debug("[SemanticStore] 清理超时闲置语义快照 sessionId={}", e.getKey());
             }

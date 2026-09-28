@@ -10,8 +10,9 @@ public interface IQueryWorkflowEngine {
     /**
      * 执行 Planner-Workflow-Service 管线（SSE 流式输出）。
      *
-     * @param question 用户自然语言问题
+     * @param sessionId 会话 ID，用于多轮追问消歧；为空则不做上下文补全
+     * @param question  用户自然语言问题
      * @return SSE 文本流
      */
-    Flux<String> run(String question);
+    Flux<String> run(String sessionId, String question);
 }

@@ -18,6 +18,7 @@ import org.example.nlp2dsl2sql.models.dto.dsl.SemanticQueryDSL;
 import org.example.nlp2dsl2sql.semanticdsl.translator.DslTranslator;
 import org.example.nlp2dsl2sql.semanticdsl.validator.SemanticDslValidator;
 import org.example.nlp2dsl2sql.service.IQueryWorkflowEngine;
+import org.example.nlp2dsl2sql.service.memory.QueryPreprocessor;
 import org.example.nlp2dsl2sql.service.pipeline.IAnswerPipelineService;
 import org.example.nlp2dsl2sql.service.pipeline.IDslGeneratePipelineService;
 import org.example.nlp2dsl2sql.service.pipeline.IEnrichmentPipelineService;
@@ -65,22 +66,25 @@ public class QueryWorkflowEngine implements IQueryWorkflowEngine {
     private final IReviewPipelineService reviewService;
     private final ISqlExecutePipelineService sqlExecuteService;
     private final IAnswerPipelineService answerService;
+    private final QueryPreprocessor queryPreprocessor;
 
     /**
      * 运行完整管线并返回 SSE 流。
      *
-     * @param question 用户问题
+     * @param sessionId 会话 ID，用于多轮追问消歧
+     * @param question  用户问题
      * @return SSE 文本流
      */
     @Override
-    public Flux<String> run(String question) {
+    public Flux<String> run(String sessionId, String question) {
         if (question == null || question.isBlank()) {
             return Flux.just("错误: 问题不能为空");
         }
-        String trimmed = question.trim();
+        String rawQuestion = question.trim();
+        String effectiveQuestion = queryPreprocessor.preprocess(sessionId, rawQuestion);
         return Flux.defer(() -> {
             try {
-                return executeWorkflow(trimmed);
+                return executeWorkflow(sessionId, rawQuestion, effectiveQuestion);
             } catch (Nlp2dsl2sqlException e) {
                 log.warn("Workflow 业务失败: {}", e.getMessage());
                 return Flux.just("错误: " + e.getMessage());
@@ -95,10 +99,12 @@ public class QueryWorkflowEngine implements IQueryWorkflowEngine {
     /**
      * 执行规划 → 调度 →（可选）重规划循环。
      *
-     * @param question 用户问题
+     * @param sessionId      会话 ID
+     * @param rawQuestion    用户原始问题
+     * @param question       追问补全后的生效问题
      * @return SSE 流
      */
-    private Flux<String> executeWorkflow(String question) {
+    private Flux<String> executeWorkflow(String sessionId, String rawQuestion, String question) {
         log.info("━━━━━━━ Planner-Workflow 启动 ━━━━━━━");
         WorkflowContext ctx = new WorkflowContext();
         ctx.setQuestion(question);
@@ -134,6 +140,7 @@ public class QueryWorkflowEngine implements IQueryWorkflowEngine {
                 plan = doReplan(ctx);
                 continue;
             }
+            queryPreprocessor.remember(sessionId, rawQuestion, question, ctx.getSemanticDSL());
             return buildOutputFlux(ctx);
         }
     }

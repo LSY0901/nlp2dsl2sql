@@ -7,6 +7,7 @@ import io.agentscope.harness.agent.HarnessAgent;
 import lombok.extern.slf4j.Slf4j;
 import org.example.nlp2dsl2sql.models.dto.dsl.AgentSessionContext;
 import org.example.nlp2dsl2sql.service.INlp2dsl2sqlAgentService;
+import org.example.nlp2dsl2sql.service.memory.QueryPreprocessor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -27,15 +28,19 @@ import reactor.core.publisher.Flux;
 public class Nlp2dsl2sqlAgentServiceImpl implements INlp2dsl2sqlAgentService {
 
     private final HarnessAgent nlp2dsl2sqlAgentLatest;
+    private final QueryPreprocessor queryPreprocessor;
 
     /**
      * 构造多 Agent 服务。
      *
      * @param nlp2dsl2sqlAgentLatest
+     * @param queryPreprocessor
      */
     public Nlp2dsl2sqlAgentServiceImpl(
-            @Qualifier("nlp2dsl2sqlAgentLatest") HarnessAgent nlp2dsl2sqlAgentLatest) {
+            @Qualifier("nlp2dsl2sqlAgentLatest") HarnessAgent nlp2dsl2sqlAgentLatest,
+            QueryPreprocessor queryPreprocessor) {
         this.nlp2dsl2sqlAgentLatest = nlp2dsl2sqlAgentLatest;
+        this.queryPreprocessor = queryPreprocessor;
     }
 
     /**
@@ -58,13 +63,14 @@ public class Nlp2dsl2sqlAgentServiceImpl implements INlp2dsl2sqlAgentService {
             return Flux.just("错误: 问题不能为空");
         }
 
-        String trimmed = question.trim();
+        String rawQuestion = question.trim();
         String sid = (sessionId != null && !sessionId.isBlank())
                 ? sessionId.trim()
                 : java.util.UUID.randomUUID().toString();
         String uid = (userId != null && !userId.isBlank())
                 ? userId.trim()
                 : "user_" + (sid.length() > 8 ? sid.substring(0, 8) : sid);
+        String trimmed = queryPreprocessor.preprocess(sid, rawQuestion);
 
         AgentSessionContext session = new AgentSessionContext();
 
@@ -84,8 +90,10 @@ public class Nlp2dsl2sqlAgentServiceImpl implements INlp2dsl2sqlAgentService {
                         log.debug("[SSE] chunk={}", abbreviate(chunk));
                     }
                 })
-                .doOnComplete(() ->
-                        log.info("━━━━━━━ HarnessAgent 流式 ReAct 完成 ━━━━━━━"))
+                .doOnComplete(() -> {
+                    queryPreprocessor.remember(sid, rawQuestion, trimmed, session.getDsl());
+                    log.info("━━━━━━━ HarnessAgent 流式 ReAct 完成 ━━━━━━━");
+                })
                 .doOnError(e -> log.error("HarnessAgent 流式 ReAct 异常", e))
                 .onErrorResume(e -> Flux.just("错误: " + e.getMessage()));
     }

@@ -61,6 +61,11 @@ rerank:
   base-url: http://localhost:8083
   model: bge-reranker-v2-m3
 
+memory:
+  # 会话语义快照闲置过期时间。sessionId 由前端落 localStorage 长期复用，
+  # TTL 需覆盖"隔天回来继续追问"的场景
+  session-ttl: 24h
+
 logging:
   level:
     org.example.nlp2dsl2sql: debug

@@ -18,8 +18,6 @@ public class TranslatorConfig {
         SqlDialect sqlDialect = SqlDialect.fromValue(dialect);
         return switch (sqlDialect) {
             case POSTGRESQL -> new PostgreSqlTranslator();
-            case MYSQL -> new PostgreSqlTranslator();
-            case SQLSERVER -> new PostgreSqlTranslator();
         };
     }
 }

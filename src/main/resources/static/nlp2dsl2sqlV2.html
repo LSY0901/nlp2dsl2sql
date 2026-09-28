@@ -547,13 +547,37 @@
     const sendBtn = document.getElementById('sendBtn');
     let isStreaming = false;
     let currentMode = 'workflow';
-    let a2aSessionId = null;
+    /**
+     * 会话 ID 落 localStorage：刷新页面、切模式都不换新会话，
+     * 否则后端 24h 的会话语义快照会直接变孤儿（多轮追问全部失忆）。
+     * 5 个模式共用同一个 key —— 它们的 DSL 产物是模式无关的。
+     */
+    const SESSION_ID_KEY = 'nlp2dsl2sql.sessionId';
+    let sessionId = loadOrCreateSessionId();
     let awaitingSqlConfirm = false;
     let sqlConfirmPanelShownFor = '';
     /** 本轮最新待审批是否已提交（批准或拒绝），防止 SSE 续写再次弹出表单 */
     let sqlConfirmResolved = false;
     /** 当前 A2A Host 流式全文，供确认后清洗展示 */
     let a2aFullText = '';
+
+    function loadOrCreateSessionId() {
+        let sid = null;
+        try {
+            sid = localStorage.getItem(SESSION_ID_KEY);
+        } catch (e) {
+            // 隐私模式等场景 localStorage 不可用，退化为仅内存会话
+        }
+        if (!sid) {
+            sid = newSessionId();
+            try {
+                localStorage.setItem(SESSION_ID_KEY, sid);
+            } catch (e) {
+                // 忽略：无持久化能力时仅本次页面有效
+            }
+        }
+        return sid;
+    }
 
     function newSessionId() {
         if (window.crypto && crypto.randomUUID) {
@@ -725,7 +749,6 @@
         document.getElementById('modeA2aHost').classList.toggle(
                 'active', mode === 'a2aHost');
         if (mode === 'a2aHost') {
-            a2aSessionId = newSessionId();
             a2aModelName = '';
             a2aTier = '';
             resetSqlConfirmState();
@@ -734,26 +757,24 @@
     }
 
     /**
-     * 按当前模式返回对应后端 SSE 接口。
+     * 按当前模式返回对应后端 SSE 接口，统一带上 sessionId。
+     * 五个模式共用一个会话，切模式不清记忆。
      */
     function getApiEndpoint() {
+        const sid = `?sessionId=${encodeURIComponent(sessionId)}`;
         if (currentMode === 'multiAgent') {
-            return `${API_BASE_URL}/aiChat/nlp2Dsl2SqlAgent`;
+            return `${API_BASE_URL}/aiChat/nlp2Dsl2SqlAgent${sid}`;
         }
         if (currentMode === 'plannerWorkflow') {
-            return `${API_BASE_URL}/aiChat/nlp2Dsl2SqlPlannerWorkflow`;
+            return `${API_BASE_URL}/aiChat/nlp2Dsl2SqlPlannerWorkflow${sid}`;
         }
         if (currentMode === 'agentSkillWorkflow') {
-            return `${API_BASE_URL}/aiChat/nlp2Dsl2SqlAgentSkillWorkflow`;
+            return `${API_BASE_URL}/aiChat/nlp2Dsl2SqlAgentSkillWorkflow${sid}`;
         }
         if (currentMode === 'a2aHost') {
-            if (!a2aSessionId) {
-                a2aSessionId = newSessionId();
-            }
-            return `${API_BASE_URL}/aiChat/a2aHost`
-                    + `?sessionId=${encodeURIComponent(a2aSessionId)}`;
+            return `${API_BASE_URL}/aiChat/a2aHost${sid}`;
         }
-        return `${API_BASE_URL}/aiChat/nlp2Dsl2SqlAgentV2`;
+        return `${API_BASE_URL}/aiChat/nlp2Dsl2SqlAgentV2${sid}`;
     }
 
     /**
@@ -905,7 +926,7 @@
      * 提交 SQL 确认（服务端以 rawInput 判定）。
      */
     async function submitSqlConfirm(rawInput) {
-        if (!awaitingSqlConfirm || !a2aSessionId) {
+        if (!awaitingSqlConfirm || !sessionId) {
             return;
         }
         const text = (rawInput || '').trim();
@@ -918,7 +939,7 @@
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            sessionId: a2aSessionId,
+                            sessionId: sessionId,
                             approved: null,
                             rawInput: text
                         })
@@ -1064,9 +1085,8 @@
         userInput.value = '';
         userInput.style.height = 'auto';
         if (currentMode === 'a2aHost') {
-            // 同一轮 A2A Host 对话复用同一个 sessionId，保证多轮问题
-            // 共享会话上下文与落盘的会话记忆文件；切换模式时由
-            // switchMode 重新生成新会话。
+            // 同一轮 A2A Host 对话复用同一个 sessionId（已落 localStorage），
+            // 保证多轮问题共享会话上下文与落盘的会话记忆文件。
             resetSqlConfirmState();
         }
         addMessage('user', text);
@@ -1104,7 +1124,12 @@
                             const sidMatch = piece.match(
                                     /sessionId:\s*([^\s\n]+)/);
                             if (sidMatch && currentMode === 'a2aHost') {
-                                a2aSessionId = sidMatch[1].trim();
+                                sessionId = sidMatch[1].trim();
+                                try {
+                                    localStorage.setItem(SESSION_ID_KEY, sessionId);
+                                } catch (e) {
+                                    // 忽略：无持久化能力时仅本次页面有效
+                                }
                             }
                             const modelMatch = piece.match(
                                     /model:\s*([^\s\n]+)/);
@@ -1163,11 +1188,11 @@
      */
     async function refreshCurrentTrace() {
         const panel = document.getElementById('tracePanel');
-        if (!panel.classList.contains('open') || !a2aSessionId) {
+        if (!panel.classList.contains('open') || !sessionId) {
             return;
         }
         try {
-            const encoded = encodeURIComponent(a2aSessionId);
+            const encoded = encodeURIComponent(sessionId);
             const resp = await fetch(
                     `${API_BASE_URL}/aiChat/a2aHost/traces/${encoded}`);
             const t = await resp.json();

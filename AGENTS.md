@@ -16,18 +16,21 @@ Spring Boot 3.5.15 + Java 21 + AgentScope 2.0.0 自然语言数据查询系统�
 ## Commands
 
 ```bash
-mvn clean compile              # 改完代码至少跑这个（当前无测试套件）
+mvn clean compile              # 改完代码至少跑这个
+mvn test                       # 36 个单测：validator / translator / HITL / trace / 会话记忆
 mvn clean package -DskipTests  # 打包
-java -jar target/Nlp2dsl2sql-0.0.1-SNAPSHOT.jar
+java -jar target/Nlp2dsl2sql-0.0.1-SNAPSHOT.jar --spring.profiles.active=local
 ```
 
 访问：`http://localhost:8079/nlp2dsl2sqlV2.html`，默认端口 `8079`。
+DB 口令在未入库的 `application-local.yaml`，本地启动需带 `--spring.profiles.active=local`（或设 `DB_PASSWORD` 环境变量）。
 
 ## Project Structure
 
 - `semanticdsl/`: 语义层核心。`validator` DSL 校验、`enricher` BFS JOIN 富化、`translator` SQL 翻译（方言抽象）、`metadata` 元数据服务、`seed` 向量灌库。
 - `tools/`: 各阶段工具（意图、检索、DSL 生成、校验、翻译、审查、SQL 执行），ReAct 工具集中注册在 `AgentToolRegistry`。
-- `service/pipeline/`: 7 阶段管线接口与实现，每阶段一个 Service。
+- `service/pipeline/`: 7 阶段管线接口与实现，每阶段一个 Service（目前仅 Planner 引擎在用）。
+- `service/memory/`: 会话多轮记忆。`QueryPreprocessor` 是唯一入口（读侧追问消歧 / 写侧快照沉淀），`SemanticSessionStore` 进程内 TTL 存储，`QueryContextRewriter` 追问改写器。
 - `planner/`: QueryPlan 规划器（LLM 出计划、引擎调度步骤）。
 - `a2a/`: A2A Host 编排、模型分层路由（fast/strong）、HITL SQL 确认、trace 中间件。
 - `intent/`: 规则优先的意图分类器。
@@ -42,6 +45,8 @@ java -jar target/Nlp2dsl2sql-0.0.1-SNAPSHOT.jar
 - SQL 只能由 `DslTranslator` 从富化后的 DSL 确定性生成，LLM 从不直接写 SQL。
 - JOIN 路径由 `SemanticDslEnricher` BFS 最短路径求解，不手写 JOIN。
 - 检索两阶段：Embedding Top-K 召回 + Rerank 重排（`DslRetriever`）。
+- 多轮记忆分两套，职责不重叠：追问消歧与槽位继承走 `QueryPreprocessor`（确定性、可测）；用户画像与能力边界走 AgentScope 内置 memory（模型自行 flush 到 MEMORY.md）。快照只存问句与语义 DSL，不存查询结果。
+- 5 种编排形态共享同一份 `QueryPreprocessor` 与同一份语义快照：它们共用同一套 DSL 生成工具与提示词，产物模式无关。前端 sessionId 落 localStorage，切模式与刷新都不清记忆。
 
 ## Backend Rules
 
@@ -59,7 +64,7 @@ java -jar target/Nlp2dsl2sql-0.0.1-SNAPSHOT.jar
 - SQL 执行只走 `SqlExecuteTool` / `SqlExecutionTool`：仅允许 SELECT、拒绝分号、命中黑名单关键字即拒绝、一律 JDBC 参数绑定。
 - SQL 审查（`ReviewTool`）不通过时不得执行，须修正后重审。
 - 意图识别先走 `RuleIntentClassifier` 规则命中，未命中才调 LLM。
-- 新增 SQL 方言：继承 `AbstractDslTranslator` 实现，并在 `application.yaml` 的 `dsl.translator.dialect` 切换。
+- 新增 SQL 方言：继承 `AbstractDslTranslator` 实现，并在 `application.yaml` 的 `dsl.translator.dialect` 切换。当前**仅实现 PostgreSQL**，配置其它值会启动失败（`SqlDialect.fromValue` 抛异常，不静默回退）。
 
 ## API
 
@@ -81,7 +86,8 @@ java -jar target/Nlp2dsl2sql-0.0.1-SNAPSHOT.jar
 - 配置集中在 `src/main/resources/application.yaml`。
 - 外部依赖：LLM `api.deepseek.com`、Embedding `localhost:8082`（bge-m3）、Rerank `localhost:8083`（bge-reranker-v2-m3）、PostgreSQL `localhost:5432/agent_db`（schema `agent`）。
 - 元数据表均在 `agent` schema：`dsl_entity` / `dsl_attribute` / `dsl_metric` / `dsl_metric_attribute` / `dsl_metric_dimension` / `dsl_dimension` / `dsl_dimension_value` / `dsl_relation` / `dsl_filter` / `dsl_synonym`，建表脚本为根目录 `ai_agent.sql`。
-- A2A trace JSONL 写入 `.agentscope/traces/a2a-host.jsonl`，容量与 TTL 由 `a2a.host.trace.*` 控制。
+- A2A trace JSONL 写入 `.agentscope/traces/a2a-host.jsonl`（已 gitignore），容量与 TTL 由 `a2a.host.trace.*` 控制。
+- 会话快照 TTL 由 `memory.session-ttl` 控制（默认 24h）。
 - 启动前置条件：数据库已执行 `ai_agent.sql`，Embedding/Rerank 服务已就绪，`agentscope.openai.api-key` 已配置。
 
 ## Never Do
@@ -97,6 +103,7 @@ java -jar target/Nlp2dsl2sql-0.0.1-SNAPSHOT.jar
 ## More Rules
 
 - 多 Agent 架构设计与演进背景：`docs/MULTI_AGENT_DESIGN.md`
+- 关键决策记录：`docs/adr/`
 
 ## Agent skills
 

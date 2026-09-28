@@ -11,6 +11,7 @@ import org.example.nlp2dsl2sql.tools.DslRetriever;
 import org.example.nlp2dsl2sql.semanticdsl.translator.DslTranslator;
 import org.example.nlp2dsl2sql.semanticdsl.validator.SemanticDslValidator;
 import org.example.nlp2dsl2sql.service.ISemanticDslAgentService;
+import org.example.nlp2dsl2sql.service.memory.QueryPreprocessor;
 import org.example.nlp2dsl2sql.tools.IntentTool;
 import org.example.nlp2dsl2sql.tools.ReviewTool;
 import org.example.nlp2dsl2sql.tools.SqlExecuteTool;
@@ -47,16 +48,19 @@ public class SemanticDslAgentServiceImpl implements ISemanticDslAgentService {
     private final ReviewTool reviewTool;
     private final SqlExecuteTool sqlExecuteTool;
     private final IntentTool intentTool;
+    private final QueryPreprocessor queryPreprocessor;
 
     @Override
-    public Flux<String> nlp2Dsl2SqlAgentV2(String question) {
+    public Flux<String> nlp2Dsl2SqlAgentV2(String sessionId, String question) {
         if (question == null || question.isBlank()) {
             return Flux.just("错误: 问题不能为空");
         }
+        String rawQuestion = question.trim();
+        String effectiveQuestion = queryPreprocessor.preprocess(sessionId, rawQuestion);
 
         return Flux.defer(() -> {
             try {
-                return runPipeline(question.trim());
+                return runPipeline(sessionId, rawQuestion, effectiveQuestion);
             } catch (PipelineException e) {
                 log.warn("Agent业务失败: {}", e.getMessage());
                 return Flux.just("错误: " + e.getMessage());
@@ -67,7 +71,7 @@ public class SemanticDslAgentServiceImpl implements ISemanticDslAgentService {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
-    private Flux<String> runPipeline(String question) throws Exception {
+    private Flux<String> runPipeline(String sessionId, String rawQuestion, String question) throws Exception {
         log.info("━━━━━━━ NLP2DSL2SQL Agent V2 启动 ━━━━━━━");
         log.info("用户问题: {}", question);
 
@@ -122,6 +126,8 @@ public class SemanticDslAgentServiceImpl implements ISemanticDslAgentService {
         // 执行SQL
         List<Map<String, Object>> queryResult = sqlExecuteTool.executeSql(sql, params);
         log.info("━━━━━━━ NLP2DSL2SQL Agent V2 管线完成，开始流式回答 ━━━━━━━");
+
+        queryPreprocessor.remember(sessionId, rawQuestion, question, semanticDSL);
 
         String answerPrompt = """
                 用户问题：%s

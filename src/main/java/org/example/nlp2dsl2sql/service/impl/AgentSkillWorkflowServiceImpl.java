@@ -11,6 +11,7 @@ import io.agentscope.harness.agent.HarnessAgent;
 import lombok.extern.slf4j.Slf4j;
 import org.example.nlp2dsl2sql.models.dto.dsl.AgentSessionContext;
 import org.example.nlp2dsl2sql.service.IAgentSkillWorkflowService;
+import org.example.nlp2dsl2sql.service.memory.QueryPreprocessor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -25,16 +26,20 @@ import reactor.core.publisher.Flux;
 public class AgentSkillWorkflowServiceImpl implements IAgentSkillWorkflowService {
 
     private final HarnessAgent skillHarnessAgent;
+    private final QueryPreprocessor queryPreprocessor;
 
     /**
      * 构造服务。
      *
      * @param skillHarnessAgent Skill Harness Agent
+     * @param queryPreprocessor  多轮记忆入口
      */
     public AgentSkillWorkflowServiceImpl(
             @Qualifier("nlp2dsl2sqlSkillAgent")
-            HarnessAgent skillHarnessAgent) {
+            HarnessAgent skillHarnessAgent,
+            QueryPreprocessor queryPreprocessor) {
         this.skillHarnessAgent = skillHarnessAgent;
+        this.queryPreprocessor = queryPreprocessor;
     }
 
     /**
@@ -61,13 +66,14 @@ public class AgentSkillWorkflowServiceImpl implements IAgentSkillWorkflowService
         if (question == null || question.isBlank()) {
             return Flux.just("错误: 问题不能为空");
         }
-        String trimmed = question.trim();
+        String rawQuestion = question.trim();
         String sid = (sessionId != null && !sessionId.isBlank())
                 ? sessionId.trim()
                 : java.util.UUID.randomUUID().toString();
         String uid = (userId != null && !userId.isBlank())
                 ? userId.trim()
                 : "user_" + (sid.length() > 8 ? sid.substring(0, 8) : sid);
+        String trimmed = queryPreprocessor.preprocess(sid, rawQuestion);
 
         AgentSessionContext session = new AgentSessionContext();
         RuntimeContext ctx = RuntimeContext.builder()
@@ -82,8 +88,10 @@ public class AgentSkillWorkflowServiceImpl implements IAgentSkillWorkflowService
         return skillHarnessAgent
                 .streamEvents(new UserMessage(trimmed), ctx)
                 .mapNotNull(this::mapEventToSseChunk)
-                .doOnComplete(() ->
-                        log.info("━━━━━━━ Skill-Harness 完成 ━━━━━━━"))
+                .doOnComplete(() -> {
+                    queryPreprocessor.remember(sid, rawQuestion, trimmed, session.getDsl());
+                    log.info("━━━━━━━ Skill-Harness 完成 ━━━━━━━");
+                })
                 .doOnError(e -> log.error("Skill-Harness 异常", e))
                 .onErrorResume(e -> Flux.just("错误: " + e.getMessage()));
     }
