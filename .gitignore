@@ -32,3 +32,8 @@ build/
 ### VS Code ###
 .vscode/
 .mvn
+
+### Local secrets & runtime traces (enterprise P0) ###
+.agentscope/
+*.jsonl
+**/application-local.yaml

@@ -542,6 +542,10 @@
 <script>
     const API_BASE = 'http://localhost:8079';
     const API_BASE_URL = API_BASE.replace(/\/+$/, '');
+    // 网关钥匙：localStorage.AI_API_KEY，与后端 ai.api-key 对应。
+    // 缺失时请求会被 401，可在控制台执行 localStorage.setItem('AI_API_KEY','<key>') 后刷新。
+    const AI_API_KEY = (() => { try { return localStorage.getItem('AI_API_KEY') || ''; } catch (e) { return ''; } })();
+    function apiHeaders(extra) { return Object.assign({}, extra || {}, AI_API_KEY ? { 'X-API-KEY': AI_API_KEY } : {}); }
     const chatContainer = document.getElementById('chatContainer');
     const userInput = document.getElementById('userInput');
     const sendBtn = document.getElementById('sendBtn');
@@ -614,7 +618,7 @@
         const detail = document.getElementById('traceDetail');
         detail.innerHTML = '';
         try {
-            const resp = await fetch(`${API_BASE_URL}/aiChat/a2aHost/traces`);
+            const resp = await fetch(`${API_BASE_URL}/aiChat/a2aHost/traces`, { headers: apiHeaders() });
             const list = await resp.json();
             if (!Array.isArray(list) || list.length === 0) {
                 box.innerHTML = '<div class="trace-empty">暂无 trace 记录</div>';
@@ -656,7 +660,7 @@
         const box = document.getElementById('traceDetail');
         try {
             const resp = await fetch(
-                    `${API_BASE_URL}/aiChat/a2aHost/traces/${encodedSessionId}`);
+                    `${API_BASE_URL}/aiChat/a2aHost/traces/${encodedSessionId}`, { headers: apiHeaders() });
             const t = await resp.json();
             if (!t || !t.sessionId) {
                 box.innerHTML = '<div class="trace-empty">未找到该 trace</div>';
@@ -937,7 +941,7 @@
             const resp = await fetch(
                     `${API_BASE_URL}/aiChat/a2aHost/confirm`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: apiHeaders({ 'Content-Type': 'application/json' }),
                         body: JSON.stringify({
                             sessionId: sessionId,
                             approved: null,
@@ -1097,7 +1101,7 @@
             const base = getApiEndpoint();
             const sep = base.includes('?') ? '&' : '?';
             const url = `${base}${sep}question=${encodeURIComponent(text)}`;
-            const resp = await fetch(url);
+            const resp = await fetch(url, { headers: apiHeaders() });
             if (!resp.ok) {
                 const errText = await resp.text().catch(() => '');
                 bubble.innerHTML = `<span class="error-text">请求失败: ${resp.status} ${resp.statusText}\n${escapeHtml(errText)}</span>`;
@@ -1194,7 +1198,7 @@
         try {
             const encoded = encodeURIComponent(sessionId);
             const resp = await fetch(
-                    `${API_BASE_URL}/aiChat/a2aHost/traces/${encoded}`);
+                    `${API_BASE_URL}/aiChat/a2aHost/traces/${encoded}`, { headers: apiHeaders() });
             const t = await resp.json();
             const detail = document.getElementById('traceDetail');
             if (t && t.sessionId) {
