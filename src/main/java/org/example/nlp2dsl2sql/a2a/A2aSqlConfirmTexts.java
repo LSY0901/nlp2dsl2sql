@@ -29,16 +29,16 @@ public final class A2aSqlConfirmTexts {
     /**
      * 组装 SSE 待确认片段。
      *
-     * @param sessionId  会话 ID
-     * @param toolCallId 工具调用 ID
-     * @param sql        待执行 SQL
+     * @param sessionId 会话 ID
+     * @param confirmId 确认 ID（提交确认时回传，用于精确匹配挂起）
+     * @param sql       待执行 SQL
      * @return SSE 文本
      */
     public static String formatPending(
-            String sessionId, String toolCallId, String sql) {
+            String sessionId, String confirmId, String sql) {
         return "\n\n========== " + MARK_PENDING + " ==========\n"
                 + "sessionId: " + nullToEmpty(sessionId) + "\n"
-                + "toolCallId: " + nullToEmpty(toolCallId) + "\n"
+                + "confirmId: " + nullToEmpty(confirmId) + "\n"
                 + "sql:\n"
                 + nullToEmpty(sql) + "\n"
                 + "========== " + MARK_PROMPT + " ==========\n\n";

@@ -5,6 +5,7 @@ import io.agentscope.core.message.UserMessage;
 import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import lombok.extern.slf4j.Slf4j;
 import org.example.nlp2dsl2sql.a2a.A2aHostModelRouter;
+import org.example.nlp2dsl2sql.config.MemoryProperties;
 import org.example.nlp2dsl2sql.models.dto.dsl.SemanticFilter;
 import org.example.nlp2dsl2sql.models.dto.dsl.SemanticQueryDSL;
 import org.example.nlp2dsl2sql.models.dto.dsl.SemanticSessionSnapshot;
@@ -34,19 +35,37 @@ public class QueryContextRewriter {
                     + "|(的话[？?]?$)");
 
     private final A2aHostModelRouter modelRouter;
+    private final MemoryProperties memoryProperties;
 
-    public QueryContextRewriter(A2aHostModelRouter modelRouter) {
+    public QueryContextRewriter(
+            A2aHostModelRouter modelRouter,
+            MemoryProperties memoryProperties) {
         this.modelRouter = modelRouter;
+        this.memoryProperties = memoryProperties;
     }
 
     /**
-     * 如有需要，对当前子问题执行上下文补全改写。
+     * 如有需要，对当前子问题执行上下文补全改写（不注入画像）。
      *
      * @param currentQuery     当前子问题
      * @param previousSnapshot 上一轮语义快照
      * @return 改写后的自包含完整查询（若无需改写或改写失败则返回原句）
      */
     public String rewriteIfNeeded(String currentQuery, SemanticSessionSnapshot previousSnapshot) {
+        return rewriteIfNeeded(currentQuery, previousSnapshot, null);
+    }
+
+    /**
+     * 如有需要，对当前子问题执行上下文补全改写（注入用户画像增强改写质量）。
+     *
+     * @param currentQuery     当前子问题
+     * @param previousSnapshot 上一轮语义快照
+     * @param profileJson      用户画像 JSON，可为 null（等价于不注入）
+     * @return 改写后的自包含完整查询（若无需改写或改写失败则返回原句）
+     */
+    public String rewriteIfNeeded(String currentQuery,
+                                  SemanticSessionSnapshot previousSnapshot,
+                                  String profileJson) {
         if (currentQuery == null || currentQuery.isBlank()) {
             return currentQuery;
         }
@@ -62,7 +81,7 @@ public class QueryContextRewriter {
 
         log.info("[Rewriter] 检测到多轮追问/省略特征，触发 Fast LLM 上下文改写: '{}'", trimmed);
         try {
-            String rewritten = callFastLlmRewrite(trimmed, previousSnapshot);
+            String rewritten = callFastLlmRewrite(trimmed, previousSnapshot, profileJson);
             if (rewritten != null && !rewritten.isBlank()) {
                 log.info("[Rewriter] 改写成功: '{}' -> '{}'", trimmed, rewritten);
                 return rewritten;
@@ -87,13 +106,29 @@ public class QueryContextRewriter {
     }
 
     /**
-     * 调用 Fast 档位模型进行 1-shot 轻量改写
+     * 画像注入截断：超过 {@code memory.longterm.profile.max-chars} 时截断。
      */
-    private String callFastLlmRewrite(String query, SemanticSessionSnapshot snapshot) {
+    private String truncateProfile(String profileJson) {
+        int maxChars = memoryProperties.getLongterm().getProfile().getMaxChars();
+        return profileJson.length() > maxChars
+                ? profileJson.substring(0, maxChars)
+                : profileJson;
+    }
+
+    /**
+     * 调用 Fast 档位模型进行 1-shot 轻量改写（画像非空时注入前序上下文）
+     */
+    private String callFastLlmRewrite(
+            String query, SemanticSessionSnapshot snapshot, String profileJson) {
         OpenAIChatModel fastModel = modelRouter.resolveTier("fast");
         SemanticQueryDSL dsl = snapshot.getDsl();
 
         StringBuilder contextDesc = new StringBuilder();
+        if (profileJson != null && !profileJson.isBlank()) {
+            contextDesc.append("用户画像: ")
+                    .append(truncateProfile(profileJson))
+                    .append("\n");
+        }
         contextDesc.append("上一轮问题: ").append(snapshot.getQuestion()).append("\n");
         if (dsl.getMetric() != null) {
             contextDesc.append("上一轮涉及指标: ").append(dsl.getMetric()).append("\n");

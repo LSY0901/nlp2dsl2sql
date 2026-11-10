@@ -158,6 +158,15 @@ public class A2aHostServiceImpl implements IA2aHostService {
                 })
                 .doFinally(signal -> {
                     dynamicModel.unbindSessionModel(sid);
+                    // 断开即作废：按拒绝结束该会话全部挂起确认，
+                    // 避免断开后的确认在无人接收结果的流上盲执行。
+                    int invalidated = confirmRegistry.invalidateSession(
+                            sid, "sse-" + signal);
+                    if (invalidated > 0) {
+                        traceRecorder.step(sid, "hitl-invalidate",
+                                "invalidated=" + invalidated
+                                        + ", signal=" + signal);
+                    }
                     if (signal == SignalType.ON_COMPLETE) {
                         traceRecorder.finish(sid,
                                 HostTraceRecord.STATUS_COMPLETED);
@@ -174,23 +183,28 @@ public class A2aHostServiceImpl implements IA2aHostService {
     }
 
     /**
-     * 按 rawInput 判定并完成挂起决策。
+     * 按 confirmId（优先）或 sessionId 匹配挂起并完成决策。
      *
      * @param request 确认请求
      * @return 响应
      */
     @Override
     public A2aHostConfirmResponse confirm(A2aHostConfirmRequest request) {
-        if (request == null
-                || request.getSessionId() == null
-                || request.getSessionId().isBlank()) {
-            return A2aHostConfirmResponse.fail("sessionId 不能为空");
+        if (request == null) {
+            return A2aHostConfirmResponse.fail("请求不能为空");
         }
-        String sid = request.getSessionId().trim();
+        String confirmId = request.getConfirmId();
+        String sid = request.getSessionId();
+        boolean hasConfirmId = confirmId != null && !confirmId.isBlank();
+        if (!hasConfirmId && (sid == null || sid.isBlank())) {
+            return A2aHostConfirmResponse.fail("sessionId 与 confirmId 至少传一个");
+        }
         boolean approved = A2aSqlConfirmTexts.isApproved(request.getRawInput());
-        log.info("[HITL] confirm sessionId={}, rawInput={}, approved={}",
-                sid, request.getRawInput(), approved);
-        boolean ok = confirmRegistry.complete(sid, approved);
+        log.info("[HITL] confirm sessionId={}, confirmId={}, rawInput={}, approved={}",
+                sid, confirmId, request.getRawInput(), approved);
+        boolean ok = hasConfirmId
+                ? confirmRegistry.completeByConfirmId(confirmId.trim(), approved)
+                : confirmRegistry.completeBySession(sid.trim(), approved);
         if (!ok) {
             return A2aHostConfirmResponse.fail("无待确认 SQL 或已过期");
         }

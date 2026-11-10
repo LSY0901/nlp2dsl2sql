@@ -63,6 +63,9 @@ public class HostTraceRecord {
     /** 工具调用记录（host 层 + sql 层，按事件顺序） */
     private List<ToolCallRecord> toolCalls = new ArrayList<>();
 
+    /** LLM 调用记录（host 层 + sql 层，按事件顺序） */
+    private List<LlmCallRecord> llmCalls = new ArrayList<>();
+
     /** 单调递增序号（仅用于同毫秒内稳定排序，不对外展示） */
     @JsonIgnore
     private long seq;
@@ -108,5 +111,30 @@ public class HostTraceRecord {
 
         /** 调用耗时毫秒 */
         private long durationMs;
+    }
+
+    /**
+     * 单次 LLM 调用记录。
+     */
+    @Data
+    public static class LlmCallRecord {
+
+        /** 层：host（编排器） / sql（SQL Agent 内层） */
+        private String layer;
+
+        /** 调用开始时间毫秒 */
+        private long startTimeMs;
+
+        /** 调用耗时毫秒 */
+        private long durationMs;
+
+        /** 输入 token 数（事件未携带 usage 时为 null） */
+        private Integer inputTokens;
+
+        /** 输出 token 数 */
+        private Integer outputTokens;
+
+        /** 总 token 数 */
+        private Integer totalTokens;
     }
 }

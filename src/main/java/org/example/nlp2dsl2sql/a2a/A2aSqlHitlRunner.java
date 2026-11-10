@@ -79,7 +79,7 @@ public class A2aSqlHitlRunner {
                 ? hostCtx.getUserId()
                 : "user_" + (sid.length() > 8 ? sid.substring(0, 8) : sid);
 
-        String effectiveQuery = queryPreprocessor.preprocess(sid, query);
+        String effectiveQuery = queryPreprocessor.preprocess(sid, uid, query);
         if (!effectiveQuery.equals(query.trim())) {
             traceRecorder.step(sid, "query-rewrite", "from: " + query.trim() + " -> to: " + effectiveQuery);
         }
@@ -133,7 +133,7 @@ public class A2aSqlHitlRunner {
 
         // 查询成功且生成了 DSL，沉淀会话语义快照以支持多轮继承
         if (sqlSession.getDsl() != null) {
-            queryPreprocessor.remember(sid, query.trim(), effectiveQuery, sqlSession.getDsl());
+            queryPreprocessor.remember(sid, uid, query.trim(), effectiveQuery, sqlSession.getDsl());
             log.info("[Multi-Turn] 已沉淀会话语义快照 sessionId={}, dslMetric={}",
                     sid, sqlSession.getDsl().getMetric());
         }
@@ -176,16 +176,19 @@ public class A2aSqlHitlRunner {
         String sql = extractSql(toolCalls);
         String toolCallId = toolCalls.get(0).getId();
         String toolName = toolCalls.get(0).getName();
+        String confirmId = toolCallId != null && !toolCallId.isBlank()
+                ? toolCallId
+                : hostCtx.getSessionId() + "-" + System.nanoTime();
         traceRecorder.sql(hostCtx.getSessionId(), sql);
         hostCtx.emit(A2aSqlConfirmTexts.formatPending(
-                hostCtx.getSessionId(), toolCallId, sql));
+                hostCtx.getSessionId(), confirmId, sql));
 
         PendingSqlConfirm pending = new PendingSqlConfirm(
-                hostCtx.getSessionId(), agent, toolCalls);
+                hostCtx.getSessionId(), confirmId, agent, toolCalls);
         confirmRegistry.put(pending);
 
         boolean approved = waitDecision(pending, hostCtx);
-        confirmRegistry.remove(hostCtx.getSessionId());
+        confirmRegistry.remove(confirmId);
 
         if (!approved) {
             finishDenied(
@@ -293,7 +296,7 @@ public class A2aSqlHitlRunner {
     private boolean waitDecision(
             PendingSqlConfirm pending, A2aHostChatContext hostCtx) {
         return waitDecision(
-                pending, hostCtx, A2aSqlConfirmRegistry.TIMEOUT_MS);
+                pending, hostCtx, confirmRegistry.getTimeoutMs());
     }
 
     /**

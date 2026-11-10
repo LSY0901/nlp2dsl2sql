@@ -113,11 +113,21 @@ public class HostTraceRecorder {
     /**
      * 记录一次工具调用（事件跟踪器在完成时调用）。
      *
-     * @param sessionId  会话 ID
-     * @param toolCall   工具调用记录
+     * @param sessionId 会话 ID
+     * @param toolCall  工具调用记录
      */
     public void tool(String sessionId, HostTraceRecord.ToolCallRecord toolCall) {
         withRecord(sessionId, r -> r.getToolCalls().add(toolCall));
+    }
+
+    /**
+     * 记录一次 LLM 调用耗时（事件跟踪器在 ModelCallEnd 时调用）。
+     *
+     * @param sessionId 会话 ID
+     * @param llmCall   LLM 调用记录
+     */
+    public void llm(String sessionId, HostTraceRecord.LlmCallRecord llmCall) {
+        withRecord(sessionId, r -> r.getLlmCalls().add(llmCall));
     }
 
     /**

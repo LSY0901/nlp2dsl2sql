@@ -1,20 +1,25 @@
 package org.example.nlp2dsl2sql.a2a.trace;
 
 import io.agentscope.core.event.AgentEvent;
+import io.agentscope.core.event.ModelCallEndEvent;
+import io.agentscope.core.event.ModelCallStartEvent;
 import io.agentscope.core.event.ToolCallStartEvent;
 import io.agentscope.core.event.ToolResultEndEvent;
 import io.agentscope.core.event.ToolResultStartEvent;
 import io.agentscope.core.message.ToolResultState;
+import io.agentscope.core.model.ChatUsage;
 
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 按 AgentEvent 流跟踪工具调用（工具名 + 状态 + 耗时），完成时写入
+ * 按 AgentEvent 流跟踪工具调用与 LLM 调用（名称 + 状态 + 耗时），完成时写入
  * {@link HostTraceRecorder}。
  * <p>
  * 时序规则：
  * <ul>
+ *   <li>{@link ModelCallStartEvent} — 记录 LLM 调用起点（按 replyId 配对）</li>
+ *   <li>{@link ModelCallEndEvent} — 计算耗时与 token 用量写入 recorder</li>
  *   <li>{@link ToolCallStartEvent} — 建立条目，startTime=now（兜底起点）</li>
  *   <li>{@link ToolResultStartEvent} — 刷新 startTime=now（真实工具执行起点，
  *       排除 LLM 参数流式生成耗时）</li>
@@ -32,6 +37,7 @@ public class AgentEventToolTracer {
     private final String layer;
     private final Map<String, HostTraceRecord.ToolCallRecord> inflight =
             new HashMap<>();
+    private final Map<String, Long> llmStartNanos = new HashMap<>();
 
     /**
      * @param recorder  trace 记录器
@@ -51,6 +57,14 @@ public class AgentEventToolTracer {
      * @param event AgentScope 事件
      */
     public void onEvent(AgentEvent event) {
+        if (event instanceof ModelCallStartEvent start) {
+            llmStartNanos.put(replyKey(start.getReplyId()), System.nanoTime());
+            return;
+        }
+        if (event instanceof ModelCallEndEvent end) {
+            finishLlmCall(end);
+            return;
+        }
         if (event instanceof ToolCallStartEvent start) {
             HostTraceRecord.ToolCallRecord record =
                     new HostTraceRecord.ToolCallRecord();
@@ -133,5 +147,36 @@ public class AgentEventToolTracer {
         record.setDurationMs(Math.max(
                 0, System.currentTimeMillis() - record.getStartTimeMs()));
         recorder.tool(sessionId, record);
+    }
+
+    /**
+     * LLM 调用收尾：按 replyId 配对起点计算耗时，附 token 用量写入 recorder；
+     * 无配对起点（如仅观察到 End）时跳过。
+     */
+    private void finishLlmCall(ModelCallEndEvent end) {
+        Long startNanos = llmStartNanos.remove(replyKey(end.getReplyId()));
+        if (startNanos == null) {
+            return;
+        }
+        HostTraceRecord.LlmCallRecord record = new HostTraceRecord.LlmCallRecord();
+        record.setLayer(layer);
+        long durationMs = Math.max(
+                0, (System.nanoTime() - startNanos) / 1_000_000);
+        record.setStartTimeMs(System.currentTimeMillis() - durationMs);
+        record.setDurationMs(durationMs);
+        ChatUsage usage = end.getUsage();
+        if (usage != null) {
+            record.setInputTokens(usage.getInputTokens());
+            record.setOutputTokens(usage.getOutputTokens());
+            record.setTotalTokens(usage.getTotalTokens());
+        }
+        recorder.llm(sessionId, record);
+    }
+
+    /**
+     * LLM 配对键：replyId 为空时用空串（顺序执行下单槽兜底）。
+     */
+    private String replyKey(String replyId) {
+        return replyId == null ? "" : replyId;
     }
 }

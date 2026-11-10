@@ -26,4 +26,7 @@ public class A2aHostTraceProperties {
 
     /** 内存记录 TTL 毫秒（默认 1 小时） */
     private long ttlMs = 3_600_000L;
+
+    /** 是否每行立即刷盘（Delta 过滤后行量稀疏，默认开启以便实时查看；可关换吞吐） */
+    private boolean flushEveryLine = true;
 }

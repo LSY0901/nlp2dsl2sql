@@ -17,7 +17,7 @@ Spring Boot 3.5.15 + Java 21 + AgentScope 2.0.0 自然语言数据查询系统�
 
 ```bash
 mvn clean compile              # 改完代码至少跑这个
-mvn test                       # 36 个单测：validator / translator / HITL / trace / 会话记忆
+mvn test                       # 82 个单测：validator / translator / HITL / trace / 会话记忆
 mvn clean package -DskipTests  # 打包
 java -jar target/Nlp2dsl2sql-0.0.1-SNAPSHOT.jar --spring.profiles.active=local
 ```
@@ -30,7 +30,7 @@ DB 口令在未入库的 `application-local.yaml`，本地启动需带 `--spring
 - `semanticdsl/`: 语义层核心。`validator` DSL 校验、`enricher` BFS JOIN 富化、`translator` SQL 翻译（方言抽象）、`metadata` 元数据服务、`seed` 向量灌库。
 - `tools/`: 各阶段工具（意图、检索、DSL 生成、校验、翻译、审查、SQL 执行），ReAct 工具集中注册在 `AgentToolRegistry`。
 - `service/pipeline/`: 7 阶段管线接口与实现，每阶段一个 Service（目前仅 Planner 引擎在用）。
-- `service/memory/`: 会话多轮记忆。`QueryPreprocessor` 是唯一入口（读侧追问消歧 / 写侧快照沉淀），`SemanticSessionStore` 进程内 TTL 存储，`QueryContextRewriter` 追问改写器。
+- `service/memory/`: 会话记忆分层（见 ADR-0003）。`QueryPreprocessor` 是唯一入口；短期走 `SessionSnapshotStore`（Redis 快照+轮次），长期经 `MemoryArchiveWriter` 流水写穿 PG，`MemorySummaryJob`/`MemoryProfileJob` 定时 LLM 压缩出摘要与画像，`QueryContextRewriter` 改写时注入画像。
 - `planner/`: QueryPlan 规划器（LLM 出计划、引擎调度步骤）。
 - `a2a/`: A2A Host 编排、模型分层路由（fast/strong）、HITL SQL 确认、trace 中间件。
 - `intent/`: 规则优先的意图分类器。
@@ -45,7 +45,7 @@ DB 口令在未入库的 `application-local.yaml`，本地启动需带 `--spring
 - SQL 只能由 `DslTranslator` 从富化后的 DSL 确定性生成，LLM 从不直接写 SQL。
 - JOIN 路径由 `SemanticDslEnricher` BFS 最短路径求解，不手写 JOIN。
 - 检索两阶段：Embedding Top-K 召回 + Rerank 重排（`DslRetriever`）。
-- 多轮记忆分两套，职责不重叠：追问消歧与槽位继承走 `QueryPreprocessor`（确定性、可测）；用户画像与能力边界走 AgentScope 内置 memory（模型自行 flush 到 MEMORY.md）。快照只存问句与语义 DSL，不存查询结果。
+- 多轮记忆分三层（ADR-0003）：短期 Redis（快照+轮次，追问消歧与槽位继承，`QueryPreprocessor` 确定性可测）；长期 PG（流水→LLM 摘要→用户画像，画像注入改写 prompt）；AgentScope 内置 memory（模型自用 MEMORY.md，并存不读回）。快照只存问句与语义 DSL，不存查询结果。
 - 5 种编排形态共享同一份 `QueryPreprocessor` 与同一份语义快照：它们共用同一套 DSL 生成工具与提示词，产物模式无关。前端 sessionId 落 localStorage，切模式与刷新都不清记忆。
 
 ## Backend Rules
@@ -78,17 +78,20 @@ DB 口令在未入库的 `application-local.yaml`，本地启动需带 `--spring
 | `/aiChat/a2aHost/confirm` | POST (JSON) | SQL HITL 确认/拒绝 |
 | `/aiChat/a2aHost/traces` | GET (JSON) | Host trace 列表 |
 | `/aiChat/a2aHost/traces/{sessionId}` | GET (JSON) | 单条 trace 详情 |
+| `/aiChat/memory/session/{sessionId}` | GET (JSON) | 会话记忆查看（快照+轮次+摘要） |
+| `/aiChat/memory/user/{userId}` | GET (JSON) | 用户长期画像查看 |
 
 另有 A2A Server 卡片端点：`/.well-known/agent-card.json`。
 
 ## Config And Data
 
 - 配置集中在 `src/main/resources/application.yaml`。
-- 外部依赖：LLM `api.deepseek.com`、Embedding `localhost:8082`（bge-m3）、Rerank `localhost:8083`（bge-reranker-v2-m3）、PostgreSQL `localhost:5432/agent_db`（schema `agent`）。
-- 元数据表均在 `agent` schema：`dsl_entity` / `dsl_attribute` / `dsl_metric` / `dsl_metric_attribute` / `dsl_metric_dimension` / `dsl_dimension` / `dsl_dimension_value` / `dsl_relation` / `dsl_filter` / `dsl_synonym`，建表脚本为根目录 `ai_agent.sql`。
-- A2A trace JSONL 写入 `.agentscope/traces/a2a-host.jsonl`（已 gitignore），容量与 TTL 由 `a2a.host.trace.*` 控制。
-- 会话快照 TTL 由 `memory.session-ttl` 控制（默认 24h）。
-- 启动前置条件：数据库已执行 `ai_agent.sql`，Embedding/Rerank 服务已就绪，`agentscope.openai.api-key` 已配置。
+- 外部依赖：LLM `api.deepseek.com`、Embedding `localhost:8082`（bge-m3）、Rerank `localhost:8083`（bge-reranker-v2-m3）、PostgreSQL `localhost:5432/agent_db`（schema `agent`）、Redis `localhost:6379`（Docker 容器 `nlp2dsl2sql-redis`，仅绑定 127.0.0.1、数据卷 `nlp2dsl2sql-redis-data`，承接会话短期记忆）。
+- 元数据表均在 `agent` schema：`dsl_entity` / `dsl_attribute` / `dsl_metric` / `dsl_metric_attribute` / `dsl_metric_dimension` / `dsl_dimension` / `dsl_dimension_value` / `dsl_relation` / `dsl_filter` / `dsl_synonym`，建表脚本为根目录 `ai_agent.sql`。会话记忆长期表 `memory_session_archive` / `memory_session_summary` / `memory_user_profile`，建表脚本为根目录 `memory.sql`。
+- A2A trace JSONL 写入 `.agentscope/traces/a2a-host.jsonl`（`.agentscope/` 已 gitignore 且不入库）：每行一次调用耗时记录（`llm-call` / `tool-call`，带 sessionId/agentName 区分 host/sql 层，LLM 行含 token 用量），其余事件不落盘；内存 trace 另含 steps/HITL/SQL 明细，容量/TTL/刷盘由 `a2a.host.trace.*` 控制。
+- A2A HITL：挂起按 confirmId 键控（SSE 卡片回传），确认超时由 `a2a.host.confirm.timeout-ms` 控制（默认 5 分钟，超时按拒绝）；SSE 断开/异常时该会话挂起立即作废（断开即作废，不盲执行）。
+- 记忆分层铁律：短期记忆读写全在 Redis（键前缀 `nlp2dsl2sql:memory:`，快照 TTL 由 `memory.session-ttl` 控制，默认 24h）；长期记忆读写全在 PG，不跨层缓存。长期任务与注入由 `memory.longterm.*` 控制。
+- 启动前置条件：数据库已执行 `ai_agent.sql` 与 `memory.sql`，Embedding/Rerank 服务已就绪，Redis 容器 `nlp2dsl2sql-redis` 已启动，`agentscope.openai.api-key` 已配置。
 
 ## Never Do
 

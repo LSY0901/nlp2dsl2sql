@@ -9,7 +9,7 @@ import java.io.IOException;
 
 /**
  * A2A Host trace 配置：按 {@link A2aHostTraceProperties#isEnabled()} 决定是否创建
- * {@link JsonlTraceMiddleware} 单例 Bean（append + flushEveryLine 落盘）。
+ * {@link JsonlTraceMiddleware} 单例 Bean（append 落盘，Delta 过滤与刷盘策略走配置）。
  * <p>
  * 关闭时 Bean 不存在，工厂内通过 {@code ObjectProvider} 安全跳过挂载。
  */
@@ -31,6 +31,7 @@ public class HostTraceConfig {
     public JsonlTraceMiddleware a2aHostJsonlTraceMiddleware(
             A2aHostTraceProperties properties) throws IOException {
         return new JsonlTraceMiddleware(
-                properties.getJsonlFile(), true, true);
+                properties.getJsonlFile(), true,
+                properties.isFlushEveryLine());
     }
 }

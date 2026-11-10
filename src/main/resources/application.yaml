@@ -11,6 +11,11 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/agent_db?options=-c%20search_path%3Dagent%2Cpublic}
     username: ${DB_USERNAME:agent_user}
     password: ${DB_PASSWORD:}
+  data:
+    redis:
+      # 短期会话记忆（快照 + 轮次流水），容器 nlp2dsl2sql-redis
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
 
 agentscope:
   model:
@@ -55,6 +60,12 @@ a2a:
       jsonl-file: .agentscope/traces/a2a-host.jsonl
       max-records: 200
       ttl-ms: 3600000
+      # trace 只记录两类调用耗时：llm-call / tool-call（每行一次，带会话/层标识）
+      # Delta 过滤后行量稀疏，默认逐行刷盘便于实时 tail；高并发可关换吞吐
+      flush-every-line: ${A2A_TRACE_FLUSH_EVERY_LINE:true}
+    confirm:
+      # SQL HITL 用户确认等待超时；超时按拒绝处理，SSE 断开时挂起立即作废
+      timeout-ms: ${A2A_CONFIRM_TIMEOUT_MS:300000}
 
 embedding:
   base-url: ${EMBEDDING_BASE_URL:http://localhost:8082}
@@ -68,6 +79,17 @@ memory:
   # 会话语义快照闲置过期时间。sessionId 由前端落 localStorage 长期复用，
   # TTL 需覆盖"隔天回来继续追问"的场景
   session-ttl: 24h
+  longterm:
+    # 长期记忆：流水写穿 PG + 定时 LLM 压缩（摘要/画像）
+    archive-enabled: true
+    jobs-enabled: true
+    turns-keep: 50
+    summary:
+      idle-minutes: 30
+      scan-fixed-delay-ms: 600000
+    profile:
+      refresh-fixed-delay-ms: 3600000
+      max-chars: 300
 
 ai:
   # /aiChat/* 网关钥匙。本地填 application-local.yaml，生产走环境变量 AI_API_KEY，

@@ -562,6 +562,8 @@
     let sqlConfirmPanelShownFor = '';
     /** 本轮最新待审批是否已提交（批准或拒绝），防止 SSE 续写再次弹出表单 */
     let sqlConfirmResolved = false;
+    /** 当前待审批的确认 ID（来自卡片 confirmId，提交确认时回传精确匹配） */
+    let sqlConfirmId = null;
     /** 当前 A2A Host 流式全文，供确认后清洗展示 */
     let a2aFullText = '';
 
@@ -700,6 +702,21 @@
                     + `<span class="trace-step-time">+${(rel / 1000).toFixed(1)}s</span>`
                     + '</div>';
         }).join('');
+        const llms = (t.llmCalls || []).map(lc => {
+            const rel = Math.max(0, lc.startTimeMs - t.startTimeMs);
+            const layerBadge = lc.layer === 'host'
+                    ? '<span class="trace-layer trace-layer-host">HOST</span>'
+                    : '<span class="trace-layer trace-layer-sql">SQL</span>';
+            const tokens = lc.totalTokens == null ? ''
+                    : `<span class="trace-step-detail">${lc.inputTokens == null ? '-' : lc.inputTokens}`
+                    + `→${lc.outputTokens == null ? '-' : lc.outputTokens} tokens</span>`;
+            return '<div class="trace-step">'
+                    + `<span class="trace-step-name">${layerBadge} LLM 调用</span>`
+                    + tokens
+                    + `<span class="trace-step-detail">${formatDuration(lc.durationMs)}</span>`
+                    + `<span class="trace-step-time">+${(rel / 1000).toFixed(1)}s</span>`
+                    + '</div>';
+        }).join('');
         return '<div class="trace-detail-head">'
                 + `<div>${escapeHtml(t.question || '')}</div>`
                 + '<div class="trace-meta">'
@@ -711,6 +728,7 @@
                 + '</div>'
                 + (t.error ? `<div class="trace-label">错误</div><div class="error-text">${escapeHtml(t.error)}</div>` : '')
                 + (t.sql ? `<div class="trace-label">SQL</div><pre class="answer-sql">${escapeHtml(t.sql)}</pre>` : '')
+                + (llms ? `<div class="trace-label">LLM 调用</div><div class="trace-steps">${llms}</div>` : '')
                 + (tools ? `<div class="trace-label">工具调用</div><div class="trace-steps">${tools}</div>` : '')
                 + (steps ? `<div class="trace-label">步骤时间线</div><div class="trace-steps">${steps}</div>` : '')
                 + `<div class="trace-label">JSONL 落盘</div><div class="trace-meta">.agentscope/traces/a2a-host.jsonl</div>`;
@@ -796,6 +814,20 @@
     }
 
     /**
+     * 从 HITL 标记文本中解析最新待审批的 confirmId。
+     */
+    function parseConfirmId(text) {
+        const mark = '[SQL确认待审批]';
+        const idx = text.lastIndexOf(mark);
+        if (idx < 0) {
+            return null;
+        }
+        const slice = text.slice(idx);
+        const idMatch = slice.match(/confirmId: ([^\n]+)/);
+        return idMatch ? idMatch[1].trim() : null;
+    }
+
+    /**
      * 最新待审批之后是否已有确认结果（批准/拒绝/超时）。
      */
     function hasConfirmResultAfterLatestPending(fullText) {
@@ -813,6 +845,7 @@
     function settleSqlConfirmPanel(bubble, message) {
         awaitingSqlConfirm = false;
         sqlConfirmResolved = true;
+        sqlConfirmId = null;
         userInput.placeholder = '输入你的问题...';
         let panel = bubble.querySelector('.sql-confirm-panel');
         const display = stripPendingConfirmBlock(
@@ -896,6 +929,7 @@
         sqlConfirmPanelShownFor = key;
         sqlConfirmResolved = false;
         awaitingSqlConfirm = true;
+        sqlConfirmId = parseConfirmId(fullText);
         userInput.placeholder = '输入 yes 或 确认';
         let panel = bubble.querySelector('.sql-confirm-panel');
         if (!panel) {
@@ -944,6 +978,7 @@
                         headers: apiHeaders({ 'Content-Type': 'application/json' }),
                         body: JSON.stringify({
                             sessionId: sessionId,
+                            confirmId: sqlConfirmId,
                             approved: null,
                             rawInput: text
                         })
