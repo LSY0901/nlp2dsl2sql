@@ -540,11 +540,33 @@
 </div>
 
 <script>
-    const API_BASE = 'http://localhost:8079';
+    // 智能适配后端地址：
+    // 1. 如果当前页面就在 8079 端口（Spring Boot 托管），走当前同源 origin；
+    // 2. 如果是从 IDEA 内置预览（63342）、其他前端端口或本地文件 file:// 打开，固定指向当前 host 的 8079 端口。
+    const BACKEND_PORT = 8079;
+    const API_BASE = (() => {
+        if (typeof window === 'undefined' || !window.location) return `http://localhost:${BACKEND_PORT}`;
+        const loc = window.location;
+        if (loc.protocol && loc.protocol.startsWith('http')) {
+            if (String(loc.port) === String(BACKEND_PORT)) {
+                return loc.origin;
+            }
+            const host = loc.hostname || 'localhost';
+            return `http://${host}:${BACKEND_PORT}`;
+        }
+        return `http://localhost:${BACKEND_PORT}`;
+    })();
     const API_BASE_URL = API_BASE.replace(/\/+$/, '');
     // 网关钥匙：localStorage.AI_API_KEY，与后端 ai.api-key 对应。
-    // 缺失时请求会被 401，可在控制台执行 localStorage.setItem('AI_API_KEY','<key>') 后刷新。
-    const AI_API_KEY = (() => { try { return localStorage.getItem('AI_API_KEY') || ''; } catch (e) { return ''; } })();
+    // 本地开发默认兜底 'local-dev-123'（与 application-local.yaml 一致）；
+    // 生产可通过控制台 localStorage.setItem('AI_API_KEY','<key>') 覆盖。
+    const AI_API_KEY = (() => {
+        try {
+            return localStorage.getItem('AI_API_KEY') || 'local-dev-123';
+        } catch (e) {
+            return 'local-dev-123';
+        }
+    })();
     function apiHeaders(extra) { return Object.assign({}, extra || {}, AI_API_KEY ? { 'X-API-KEY': AI_API_KEY } : {}); }
     const chatContainer = document.getElementById('chatContainer');
     const userInput = document.getElementById('userInput');

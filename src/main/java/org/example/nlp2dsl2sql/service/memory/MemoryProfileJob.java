@@ -16,7 +16,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -89,7 +89,7 @@ public class MemoryProfileJob {
         MemoryUserProfile profile = profileMapper.selectById(userId);
         long seen = (profile == null || profile.getSummarySeen() == null)
                 ? 0L : profile.getSummarySeen();
-        LocalDateTime profileUpdatedAt = (profile == null) ? null : profile.getUpdatedAt();
+        OffsetDateTime profileUpdatedAt = (profile == null) ? null : profile.getUpdatedAt();
 
         LambdaQueryWrapper<MemorySessionSummary> query = new LambdaQueryWrapper<MemorySessionSummary>()
                 .eq(MemorySessionSummary::getUserId, userId);

@@ -1,9 +1,11 @@
 package org.example.nlp2dsl2sql.models.entity.memory;
 
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 /**
  * 会话流水：每轮对话一行，写穿落库（长期记忆压缩原料）。
@@ -12,6 +14,7 @@ import java.time.LocalDateTime;
 @TableName("memory_session_archive")
 public class MemorySessionArchive {
 
+    @TableId(type = IdType.AUTO)
     private Long id;
 
     /** 会话 ID */
@@ -36,5 +39,5 @@ public class MemorySessionArchive {
     private String turnType;
 
     /** 入库时间（DB 默认 now()） */
-    private LocalDateTime createdAt;
+    private OffsetDateTime createdAt;
 }

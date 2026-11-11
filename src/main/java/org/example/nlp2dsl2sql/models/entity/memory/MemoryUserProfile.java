@@ -1,9 +1,11 @@
 package org.example.nlp2dsl2sql.models.entity.memory;
 
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 /**
  * 用户画像：从会话摘要提炼的四字段 JSON，每用户一条覆盖式更新。
@@ -13,6 +15,7 @@ import java.time.LocalDateTime;
 public class MemoryUserProfile {
 
     /** 用户 ID（主键） */
+    @TableId(value = "user_id", type = IdType.INPUT)
     private String userId;
 
     /** 画像 JSON：focusAreas / preferredMetrics / preferredDimensions / notes */
@@ -22,5 +25,5 @@ public class MemoryUserProfile {
     private Long summarySeen;
 
     /** 更新时间 */
-    private LocalDateTime updatedAt;
+    private OffsetDateTime updatedAt;
 }

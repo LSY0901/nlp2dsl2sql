@@ -1,9 +1,11 @@
 package org.example.nlp2dsl2sql.models.entity.memory;
 
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 /**
  * 会话摘要：闲置会话经 LLM 压缩后的产物，每会话一条覆盖式更新。
@@ -12,6 +14,7 @@ import java.time.LocalDateTime;
 @TableName("memory_session_summary")
 public class MemorySessionSummary {
 
+    @TableId(type = IdType.AUTO)
     private Long id;
 
     /** 会话 ID（UNIQUE） */
@@ -27,11 +30,11 @@ public class MemorySessionSummary {
     private Integer turnCount;
 
     /** 首轮时间 */
-    private LocalDateTime firstTurnAt;
+    private OffsetDateTime firstTurnAt;
 
     /** 末轮时间 */
-    private LocalDateTime lastTurnAt;
+    private OffsetDateTime lastTurnAt;
 
     /** 摘要生成时间 */
-    private LocalDateTime summarizedAt;
+    private OffsetDateTime summarizedAt;
 }

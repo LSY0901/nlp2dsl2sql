@@ -105,9 +105,9 @@ ai:
   api-key: ${AI_API_KEY:}
 
 cors:
-  # 逗号分隔的精确域名（allowCredentials 下不可用 *）。本地默认同源端口，
+  # 逗号分隔的精确域名（allowCredentials 下不可用 *）。本地默认同源及 IDEA 预览端口，
   # 生产按实填，如 https://nlp.example.com,https://admin.example.com
-  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:8079}
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:8079,http://127.0.0.1:8079,http://localhost:63342,http://127.0.0.1:63342}
 
 logging:
   level:
