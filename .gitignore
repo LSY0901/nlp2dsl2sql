@@ -37,3 +37,4 @@ build/
 .agentscope/
 *.jsonl
 **/application-local.yaml
+graphify-out
