@@ -76,17 +76,25 @@ rerank:
   model: ${RERANK_MODEL:bge-reranker-v2-m3}
 
 memory:
-  # 会话语义快照闲置过期时间。sessionId 由前端落 localStorage 长期复用，
+  # 会话语义快照与短期对话状态闲置过期时间。sessionId 由前端落 localStorage 长期复用，
   # TTL 需覆盖"隔天回来继续追问"的场景
   session-ttl: 24h
+  # 短期 AgentState 消息滑动窗口上限（超限时按 USER 消息边界截断并异步触发 PG 摘要压缩）
+  max-state-messages: 30
+  # 单轮回答落库/落 Redis 时的最大截断字符数
+  answer-max-chars: 500
   longterm:
     # 长期记忆：流水写穿 PG + 定时 LLM 压缩（摘要/画像）
     archive-enabled: true
     jobs-enabled: true
-    turns-keep: 50
     summary:
       idle-minutes: 30
       scan-fixed-delay-ms: 600000
+      # 窗口截断触发摘要的节流：自上次摘要以来新增轮次 >= 该值才调 LLM（增量合并）
+      evict-min-new-turns: 5
+      # A2A Host 启动时注入最近多少条历史会话摘要
+      inject-recent-count: 3
+      inject-max-chars: 400
     profile:
       refresh-fixed-delay-ms: 3600000
       max-chars: 300

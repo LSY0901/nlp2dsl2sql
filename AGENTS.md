@@ -17,7 +17,7 @@ Spring Boot 3.5.15 + Java 21 + AgentScope 2.0.0 自然语言数据查询系统�
 
 ```bash
 mvn clean compile              # 改完代码至少跑这个
-mvn test                       # 82 个单测：validator / translator / HITL / trace / 会话记忆
+mvn test                       # 19 个单测：会话记忆 / AgentState 命名空间隔离 / HITL / 增量摘要与画像
 mvn clean package -DskipTests  # 打包
 java -jar target/Nlp2dsl2sql-0.0.1-SNAPSHOT.jar --spring.profiles.active=local
 ```
@@ -30,7 +30,7 @@ DB 口令在未入库的 `application-local.yaml`，本地启动需带 `--spring
 - `semanticdsl/`: 语义层核心。`validator` DSL 校验、`enricher` BFS JOIN 富化、`translator` SQL 翻译（方言抽象）、`metadata` 元数据服务、`seed` 向量灌库。
 - `tools/`: 各阶段工具（意图、检索、DSL 生成、校验、翻译、审查、SQL 执行），ReAct 工具集中注册在 `AgentToolRegistry`。
 - `service/pipeline/`: 7 阶段管线接口与实现，每阶段一个 Service（目前仅 Planner 引擎在用）。
-- `service/memory/`: 会话记忆分层（见 ADR-0003）。`QueryPreprocessor` 是唯一入口；短期走 `SessionSnapshotStore`（Redis 快照+轮次），长期经 `MemoryArchiveWriter` 流水写穿 PG，`MemorySummaryJob`/`MemoryProfileJob` 定时 LLM 压缩出摘要与画像，`QueryContextRewriter` 改写时注入画像。
+- `service/memory/`: 会话记忆统一双层架构（见 ADR-0003 与 `docs/UNIFIED_SESSION_MEMORY_PLAN.md`）。`QueryPreprocessor` 是语义快照与轮次归档唯一入口；短期统一走 Redis（`SpringRedisAgentStateStore#forAgent` 按 Agent 命名空间隔离多轮消息状态并按 `USER` 边界滑动窗口截断 + `SessionSnapshotStore` 托管最新语义快照），长期经 `MemoryArchiveWriter` 全量问答（含保留结尾结论的 `answer` 与 `turn_type`）写穿 PG，`MemorySummaryJob`（闲置定时 + 窗口截断节流增量合并）/`MemoryProfileJob`（按 `id` 与 `summarized_at` 增量）压缩出摘要与画像，`MemoryProfileService` 供 Host 系统提示词与 `QueryContextRewriter` 双端读回注入。彻底移除本地 `.agentscope/workspace*` 文件记忆。
 - `planner/`: QueryPlan 规划器（LLM 出计划、引擎调度步骤）。
 - `a2a/`: A2A Host 编排、模型分层路由（fast/strong）、HITL SQL 确认、trace 中间件。
 - `intent/`: 规则优先的意图分类器。
@@ -45,7 +45,7 @@ DB 口令在未入库的 `application-local.yaml`，本地启动需带 `--spring
 - SQL 只能由 `DslTranslator` 从富化后的 DSL 确定性生成，LLM 从不直接写 SQL。
 - JOIN 路径由 `SemanticDslEnricher` BFS 最短路径求解，不手写 JOIN。
 - 检索两阶段：Embedding Top-K 召回 + Rerank 重排（`DslRetriever`）。
-- 多轮记忆分三层（ADR-0003）：短期 Redis（快照+轮次，追问消歧与槽位继承，`QueryPreprocessor` 确定性可测）；长期 PG（流水→LLM 摘要→用户画像，画像注入改写 prompt）；AgentScope 内置 memory（模型自用 MEMORY.md，并存不读回）。快照只存问句与语义 DSL，不存查询结果。
+- 统一双层会话记忆（ADR-0003）：彻底移除本地 `.agentscope/workspace*`（`MEMORY.md` / `*.jsonl`）与进程内 `A2aHostSessionManager`；短期 Redis 统一承载 `AgentStateStore`（按 Agent 命名空间隔离，滑动窗口 `max-state-messages: 30` 对齐 `USER` 边界截断并触发节流增量摘要压缩）与最新语义 DSL 快照（仅 SQL 成功时更新）；长期 PG 承载全量问答流水（含 `answer` 与 `turn_type`，V2 / Planner / ReAct / Skill / A2A Host 五种模式统一经 `rememberTurn` 落库）→ LLM 增量压缩会话摘要 → LLM 提炼用户画像，并在 A2A Host 启动（注入画像 + 最近 3 条会话摘要）与 `QueryContextRewriter` 追问改写时双端读回消费。
 - 5 种编排形态共享同一份 `QueryPreprocessor` 与同一份语义快照：它们共用同一套 DSL 生成工具与提示词，产物模式无关。前端 sessionId 落 localStorage，切模式与刷新都不清记忆。
 
 ## Backend Rules

@@ -14,18 +14,20 @@ import java.util.Map;
 public interface MemorySessionArchiveMapper extends BaseMapper<MemorySessionArchive> {
 
     /**
-     * 找"已结束且未摘要"的会话候选：末轮早于闲置阈值且摘要表中无记录。
+     * 找"已结束且有新增轮次待摘要"的会话候选：
+     * 末轮早于闲置阈值，且摘要表无记录或末轮时间晚于上次摘要记录的 last_turn_at（支持复用老 sessionId 增量重压缩）。
      *
      * @param idleMinutes 闲置分钟数
      * @return 候选列表（sessionId / userId / lastTurnAt / turnCount）
      */
     @Select("""
-            SELECT session_id AS "sessionId", user_id AS "userId",
-                   MAX(created_at) AS "lastTurnAt", COUNT(*) AS "turnCount"
-            FROM memory_session_archive
-            GROUP BY session_id, user_id
-            HAVING MAX(created_at) < now() - (#{idleMinutes} * interval '1 minute')
-              AND session_id NOT IN (SELECT session_id FROM memory_session_summary)
+            SELECT a.session_id AS "sessionId", MAX(a.user_id) AS "userId",
+                   MAX(a.created_at) AS "lastTurnAt", COUNT(*) AS "turnCount"
+            FROM memory_session_archive a
+            LEFT JOIN memory_session_summary s ON a.session_id = s.session_id
+            GROUP BY a.session_id, s.last_turn_at
+            HAVING MAX(a.created_at) < now() - (#{idleMinutes} * interval '1 minute')
+               AND (s.last_turn_at IS NULL OR MAX(a.created_at) > s.last_turn_at)
             """)
     List<Map<String, Object>> findFinishedSessions(@Param("idleMinutes") int idleMinutes);
 }

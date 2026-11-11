@@ -15,12 +15,22 @@ import java.time.Duration;
 public class MemoryProperties {
 
     /**
-     * 会话语义快照闲置过期时间。
+     * 会话短期记忆（AgentState + 语义快照）闲置过期时间。
      * <p>
      * 取值 24h 而非分钟级：前端 sessionId 落 localStorage 后会长期复用同一 key，
      * 快照本身只有几 KB 文本，分钟级 TTL 会让"跨天回来追问"直接失忆。
      */
     private Duration sessionTtl = Duration.ofHours(24);
+
+    /**
+     * 短期 AgentState 消息滑动窗口上限（超限时按 USER 消息边界截断并异步触发 PG 摘要压缩）。
+     */
+    private int maxStateMessages = 30;
+
+    /**
+     * 单轮回答落库/落 Redis 时的最大截断字符数。
+     */
+    private int answerMaxChars = 500;
 
     /** 长期记忆配置 */
     private Longterm longterm = new Longterm();
@@ -36,9 +46,6 @@ public class MemoryProperties {
 
         /** 定时压缩任务总开关 */
         private boolean jobsEnabled = true;
-
-        /** Redis 轮次流水保留条数 */
-        private int turnsKeep = 50;
 
         /** 摘要任务配置 */
         private Summary summary = new Summary();
@@ -58,6 +65,15 @@ public class MemoryProperties {
 
         /** 扫描周期毫秒 */
         private long scanFixedDelayMs = 600_000L;
+
+        /** 窗口截断触发摘要的节流阈值：自上次摘要以来新增轮次不少于该值才调用 LLM */
+        private int evictMinNewTurns = 5;
+
+        /** A2A Host 启动时注入最近多少条历史会话摘要 */
+        private int injectRecentCount = 3;
+
+        /** A2A Host 启动时注入历史会话摘要的总字符上限 */
+        private int injectMaxChars = 400;
     }
 
     /**
@@ -69,7 +85,7 @@ public class MemoryProperties {
         /** 画像提炼周期毫秒 */
         private long refreshFixedDelayMs = 3_600_000L;
 
-        /** 改写 prompt 注入画像时截断字数 */
+        /** 改写/Host prompt 注入画像时截断字数 */
         private int maxChars = 300;
     }
 }

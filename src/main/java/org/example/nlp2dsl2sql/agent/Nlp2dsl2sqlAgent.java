@@ -1,28 +1,24 @@
 package org.example.nlp2dsl2sql.agent;
 
-import org.example.nlp2dsl2sql.tools.AgentToolRegistry;
+import io.agentscope.core.tool.Toolkit;
 import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import io.agentscope.harness.agent.HarnessAgent;
-import io.agentscope.harness.agent.memory.compaction.CompactionConfig;
-import io.agentscope.core.tool.Toolkit;
+import org.example.nlp2dsl2sql.service.memory.impl.SpringRedisAgentStateStore;
+import org.example.nlp2dsl2sql.tools.AgentToolRegistry;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
-import java.nio.file.Paths;
 
 /**
  * 多 Agent 配置 — 基于 AgentScope Harness 的 nlp2dsl2sqlAgentLatest + Toolkit 架构。
  * <p>
- * nlp2dsl2sqlAgentLatest 通过框架内置 ReAct 循环调用 {@link AgentToolRegistry} 中
- * 以 {@code @Tool} 注解注册的业务工具。
+ * 彻底禁用本地 Workspace（{@code MEMORY.md} / {@code sessions/*.jsonl}）与内置 compaction，
+ * 短期会话状态统一接入 {@link SpringRedisAgentStateStore}。
  */
 @Configuration
 public class Nlp2dsl2sqlAgent {
 
-    /**
-     *
-     * LLM负责规划、Workflow负责执行、Service负责能力
-     */
+    /** Agent 名，同时作为 Redis 状态键命名空间 */
+    public static final String AGENT_NAME = "nlp2dsl2sqlAgent";
 
     /**
      * nlp2dsl2sqlAgentLatest Agent 的系统提示词。
@@ -74,46 +70,44 @@ public class Nlp2dsl2sqlAgent {
 
     /**
      * nlp2dsl2sqlAgentLatest Agent — 多 Agent 系统的核心编排者。
-     * <p>
-     * 将 {@link AgentToolRegistry} 注册到 Toolkit，由 HarnessAgent
-     * 内置 ReAct 循环自动完成 tool_call → 执行 → observation。
      *
      * @param model        LLM 模型
      * @param toolRegistry 带 {@code @Tool} 注解的业务工具 Bean
+     * @param stateStore   Redis 短期会话状态存储
      * @return nlp2dsl2sqlAgentLatest HarnessAgent
      */
     @Bean
-    public HarnessAgent nlp2dsl2sqlAgentLatest(OpenAIChatModel model,
-                                        AgentToolRegistry toolRegistry) {
+    public HarnessAgent nlp2dsl2sqlAgentLatest(
+            OpenAIChatModel model,
+            AgentToolRegistry toolRegistry,
+            SpringRedisAgentStateStore stateStore) {
         Toolkit toolkit = new Toolkit();
         toolkit.registerTool(toolRegistry);
 
         return HarnessAgent.builder()
-                .name("nlp2dsl2sqlAgent")
+                .name(AGENT_NAME)
                 .sysPrompt(SUPERVISOR_PROMPT)
                 .model(model)
                 .toolkit(toolkit)
-                // 最多 15 轮
                 .maxIters(15)
-                .workspace(Paths.get(".agentscope/workspace"))
+                // 按 Agent 名隔离 Redis 状态键，避免与同 sessionId 的 Host/Skill 模式互相恢复消息
+                .stateStore(stateStore.forAgent(AGENT_NAME))
                 // SSE 中断时会话可能残留未完成的 tool_call；开启后自动补错误结果继续对话。
                 .enablePendingToolRecovery(true)
-                // 关闭与 NLP→SQL 无关的内置工具，避免干扰业务 ReAct。
-                // 注意：不要 disableMemoryHooks —— 会话 JSONL / MEMORY 写入依赖它。
-//                .disableFilesystemTools()
-//                .disableShellTool()
-//                .disableMemoryTools()
-//                .disableSubagents()
-//                .disableDynamicSubagents()
-//                .disableDynamicSkills()
-//                .disableDefaultWorkspaceSkills()
-//                .disableWorkspaceContext()
-//                .disableAtPathExpansion()
-//                .disableToolsConfig()
-                .compaction(CompactionConfig.builder()
-                        .triggerMessages(30)
-                        .keepMessages(10)
-                        .build())
+                // 彻底关闭本地 Workspace 文件工具、本地记忆钩子与本地会话落盘
+                .disableFilesystemTools()
+                .disableShellTool()
+                .disableMemoryTools()
+                .disableMemoryHooks()
+                .disableSessionPersistence()
+                .disableWorkspaceContext()
+                .disableCompaction()
+                .disableSubagents()
+                .disableDynamicSubagents()
+                .disableDynamicSkills()
+                .disableDefaultWorkspaceSkills()
+                .disableAtPathExpansion()
+                .disableToolsConfig()
                 .build();
     }
 }

@@ -127,8 +127,6 @@ public class SemanticDslAgentServiceImpl implements ISemanticDslAgentService {
         List<Map<String, Object>> queryResult = sqlExecuteTool.executeSql(sql, params);
         log.info("━━━━━━━ NLP2DSL2SQL Agent V2 管线完成，开始流式回答 ━━━━━━━");
 
-        queryPreprocessor.remember(sessionId, rawQuestion, question, semanticDSL);
-
         String answerPrompt = """
                 用户问题：%s
 
@@ -142,11 +140,15 @@ public class SemanticDslAgentServiceImpl implements ISemanticDslAgentService {
         String intentBlock = "意图：" + intentType.name() + "\n\n";
         String sqlBlock = "SQL：\n" + sql + "\n\n结论：\n";
 
+        // 流正常结束后汇总一问一答落记忆（快照 + PG 归档），与其它编排形态口径一致
+        StringBuilder answer = new StringBuilder();
         return Flux.concat(
                 Flux.just(intentBlock),
                 Flux.just(sqlBlock),
-                streamLlmAnswer(answerPrompt)
-        );
+                streamLlmAnswer(answerPrompt).doOnNext(answer::append)
+        ).doOnComplete(() -> queryPreprocessor.rememberTurn(
+                sessionId, null, rawQuestion, question,
+                semanticDSL, answer.toString(), "SQL"));
     }
 
     @Override

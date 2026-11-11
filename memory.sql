@@ -1,23 +1,29 @@
--- 会话记忆分层存储：短期在 Redis（快照 + 轮次），本脚本建长期 PG 表。
+-- 会话记忆分层存储：短期在 Redis（AgentState + 快照 + 轮次），本脚本建长期 PG 表。
 -- 前置：数据库已执行 ai_agent.sql（agent schema 与 pgvector 已就绪）。
 CREATE EXTENSION IF NOT EXISTS vector;
 
--- 会话流水：每轮一行，写穿
-CREATE TABLE agent.memory_session_archive (
+-- 会话流水：每轮一行，写穿（含回答结论与轮次类型）
+CREATE TABLE IF NOT EXISTS agent.memory_session_archive (
     id                  BIGSERIAL PRIMARY KEY,
     session_id          VARCHAR(64) NOT NULL,
     user_id             VARCHAR(64),
     question            TEXT NOT NULL,
     effective_question  TEXT,
     dsl_json            TEXT,
+    answer              TEXT,
+    turn_type           VARCHAR(16) NOT NULL DEFAULT 'SQL',
     question_embedding  vector(1024),
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_memory_archive_session ON agent.memory_session_archive(session_id);
-CREATE INDEX idx_memory_archive_user ON agent.memory_session_archive(user_id, created_at);
+-- 兼容已建表环境的幂等升级语句
+ALTER TABLE agent.memory_session_archive ADD COLUMN IF NOT EXISTS answer TEXT;
+ALTER TABLE agent.memory_session_archive ADD COLUMN IF NOT EXISTS turn_type VARCHAR(16) NOT NULL DEFAULT 'SQL';
+
+CREATE INDEX IF NOT EXISTS idx_memory_archive_session ON agent.memory_session_archive(session_id);
+CREATE INDEX IF NOT EXISTS idx_memory_archive_user ON agent.memory_session_archive(user_id, created_at);
 
 -- 会话摘要：每会话一条，覆盖式 upsert
-CREATE TABLE agent.memory_session_summary (
+CREATE TABLE IF NOT EXISTS agent.memory_session_summary (
     id            BIGSERIAL PRIMARY KEY,
     session_id    VARCHAR(64) NOT NULL UNIQUE,
     user_id       VARCHAR(64),
@@ -27,10 +33,10 @@ CREATE TABLE agent.memory_session_summary (
     last_turn_at  TIMESTAMPTZ,
     summarized_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_memory_summary_user ON agent.memory_session_summary(user_id);
+CREATE INDEX IF NOT EXISTS idx_memory_summary_user ON agent.memory_session_summary(user_id);
 
 -- 用户画像：每用户一条，覆盖式 upsert
-CREATE TABLE agent.memory_user_profile (
+CREATE TABLE IF NOT EXISTS agent.memory_user_profile (
     user_id      VARCHAR(64) PRIMARY KEY,
     profile_json TEXT NOT NULL,
     summary_seen BIGINT NOT NULL DEFAULT 0,

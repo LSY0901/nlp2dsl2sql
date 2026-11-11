@@ -11,6 +11,7 @@ import org.example.nlp2dsl2sql.service.memory.QueryPreprocessor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.SignalType;
 
 /**
  * 多 Agent 协作服务实现 — HarnessAgent 内置 ReAct + {@code @Tool} Toolkit。
@@ -70,9 +71,10 @@ public class Nlp2dsl2sqlAgentServiceImpl implements INlp2dsl2sqlAgentService {
         String uid = (userId != null && !userId.isBlank())
                 ? userId.trim()
                 : "user_" + (sid.length() > 8 ? sid.substring(0, 8) : sid);
-        String trimmed = queryPreprocessor.preprocess(sid, rawQuestion);
+        String trimmed = queryPreprocessor.preprocess(sid, uid, rawQuestion);
 
         AgentSessionContext session = new AgentSessionContext();
+        StringBuilder answerBuf = new StringBuilder();
 
         RuntimeContext ctx = RuntimeContext.builder()
                 .userId(uid)
@@ -84,15 +86,29 @@ public class Nlp2dsl2sqlAgentServiceImpl implements INlp2dsl2sqlAgentService {
 
         return nlp2dsl2sqlAgentLatest
                 .streamEvents(new UserMessage(trimmed), ctx)
-                .mapNotNull(this::mapEventToSseChunk)
+                .mapNotNull(event -> {
+                    if (event instanceof TextBlockDeltaEvent delta
+                            && delta.getDelta() != null) {
+                        answerBuf.append(delta.getDelta());
+                    }
+                    return mapEventToSseChunk(event);
+                })
                 .doOnNext(chunk -> {
                     if (log.isDebugEnabled()) {
                         log.debug("[SSE] chunk={}", abbreviate(chunk));
                     }
                 })
-                .doOnComplete(() -> {
-                    queryPreprocessor.remember(sid, rawQuestion, trimmed, session.getDsl());
-                    log.info("━━━━━━━ HarnessAgent 流式 ReAct 完成 ━━━━━━━");
+                // 正常完成与客户端断开都归档：断开时 Redis AgentState 已回写本轮消息，
+                // 只在完成时归档会造成短期有、长期无的不一致
+                .doFinally(signal -> {
+                    if (signal == SignalType.ON_ERROR) {
+                        return;
+                    }
+                    queryPreprocessor.rememberTurn(
+                            sid, uid, rawQuestion, trimmed,
+                            session.getDsl(), answerBuf.toString(),
+                            session.getDsl() != null ? "SQL" : "CHITCHAT");
+                    log.info("━━━━━━━ HarnessAgent 流式 ReAct 结束 signal={} ━━━━━━━", signal);
                 })
                 .doOnError(e -> log.error("HarnessAgent 流式 ReAct 异常", e))
                 .onErrorResume(e -> Flux.just("错误: " + e.getMessage()));

@@ -1,5 +1,6 @@
 package org.example.nlp2dsl2sql.service.impl;
 
+import io.agentscope.core.ReActAgent;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
 import io.agentscope.core.event.TextBlockDeltaEvent;
@@ -8,20 +9,23 @@ import io.agentscope.core.event.ToolResultEndEvent;
 import io.agentscope.core.event.ToolResultTextDeltaEvent;
 import io.agentscope.core.message.UserMessage;
 import io.agentscope.extensions.model.openai.OpenAIChatModel;
-import io.agentscope.harness.agent.HarnessAgent;
 import lombok.extern.slf4j.Slf4j;
-import org.example.nlp2dsl2sql.a2a.A2aHostSessionManager;
+import org.example.nlp2dsl2sql.a2a.A2aHostAgentFactory;
 import org.example.nlp2dsl2sql.a2a.A2aHostChatContext;
 import org.example.nlp2dsl2sql.a2a.A2aHostModelRouter;
-import org.example.nlp2dsl2sql.a2a.DynamicRoutingChatModel;
+import org.example.nlp2dsl2sql.a2a.A2aHostPrompt;
 import org.example.nlp2dsl2sql.a2a.A2aSqlConfirmRegistry;
 import org.example.nlp2dsl2sql.a2a.A2aSqlConfirmTexts;
+import org.example.nlp2dsl2sql.a2a.DynamicRoutingChatModel;
 import org.example.nlp2dsl2sql.a2a.trace.AgentEventToolTracer;
 import org.example.nlp2dsl2sql.a2a.trace.HostTraceRecord;
 import org.example.nlp2dsl2sql.a2a.trace.HostTraceRecorder;
 import org.example.nlp2dsl2sql.models.vo.A2aHostConfirmRequest;
 import org.example.nlp2dsl2sql.models.vo.A2aHostConfirmResponse;
 import org.example.nlp2dsl2sql.service.IA2aHostService;
+import org.example.nlp2dsl2sql.service.memory.MemoryProfileService;
+import org.example.nlp2dsl2sql.service.memory.QueryPreprocessor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.SignalType;
@@ -30,40 +34,67 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * A2A Host SSE 服务（含 SQL HITL 确认桥接）。
+ * A2A Host SSE 服务（含 SQL HITL 确认桥接与统一分层会话记忆）。
  * <p>
- * Host Agent 每次请求按问题复杂度路由模型并新建，避免单例绑定单一模型。
+ * 每次请求：
+ * <ol>
+ *   <li>从 PG 读取用户的长期记忆（用户画像 + 最近 K 条历史会话摘要）拼入 Host 系统提示词尾部；</li>
+ *   <li>通过 {@link A2aHostAgentFactory} 构建无状态 {@link ReActAgent}，短期对话消息由 Redis {@code AgentStateStore} 自动恢复与回写；</li>
+ *   <li>流正常完成（{@code ON_COMPLETE}）时，按「一问一答一轮」汇总本轮回答与轮次类型写入 Redis {@code turns} 与 PG {@code memory_session_archive}。</li>
+ * </ol>
  */
 @Slf4j
 @Service
 public class A2aHostServiceImpl implements IA2aHostService {
 
-    private final A2aHostSessionManager sessionManager;
+    private final A2aHostAgentFactory hostAgentFactory;
     private final A2aHostModelRouter modelRouter;
     private final A2aSqlConfirmRegistry confirmRegistry;
     private final HostTraceRecorder traceRecorder;
     private final DynamicRoutingChatModel dynamicModel;
+    private final MemoryProfileService memoryProfileService;
+    private final QueryPreprocessor queryPreprocessor;
 
     /**
-     * 构造 A2A Host 服务。
-     *
-     * @param sessionManager   Host Agent 会话缓存管理器
-     * @param modelRouter      模型路由器
-     * @param confirmRegistry  SQL 确认挂起表
-     * @param traceRecorder    trace 内存记录器
-     * @param dynamicModel     动态路由模型代理
+     * 兼容 5 参构造（仅供单测便捷构造）。
      */
     public A2aHostServiceImpl(
-            A2aHostSessionManager sessionManager,
+            A2aHostAgentFactory hostAgentFactory,
             A2aHostModelRouter modelRouter,
             A2aSqlConfirmRegistry confirmRegistry,
             HostTraceRecorder traceRecorder,
             DynamicRoutingChatModel dynamicModel) {
-        this.sessionManager = sessionManager;
+        this(hostAgentFactory, modelRouter, confirmRegistry, traceRecorder,
+                dynamicModel, null, null);
+    }
+
+    /**
+     * 构造 A2A Host 服务。
+     *
+     * @param hostAgentFactory     Host Agent 工厂
+     * @param modelRouter          模型路由器
+     * @param confirmRegistry      SQL 确认挂起表
+     * @param traceRecorder        trace 内存记录器
+     * @param dynamicModel         动态路由模型代理
+     * @param memoryProfileService PG 长期记忆（画像+近期摘要）读取服务
+     * @param queryPreprocessor    会话记忆入口
+     */
+    @Autowired
+    public A2aHostServiceImpl(
+            A2aHostAgentFactory hostAgentFactory,
+            A2aHostModelRouter modelRouter,
+            A2aSqlConfirmRegistry confirmRegistry,
+            HostTraceRecorder traceRecorder,
+            DynamicRoutingChatModel dynamicModel,
+            MemoryProfileService memoryProfileService,
+            QueryPreprocessor queryPreprocessor) {
+        this.hostAgentFactory = hostAgentFactory;
         this.modelRouter = modelRouter;
         this.confirmRegistry = confirmRegistry;
         this.traceRecorder = traceRecorder;
         this.dynamicModel = dynamicModel;
+        this.memoryProfileService = memoryProfileService;
+        this.queryPreprocessor = queryPreprocessor;
     }
 
     /**
@@ -107,7 +138,9 @@ public class A2aHostServiceImpl implements IA2aHostService {
         OpenAIChatModel model = route.model();
         traceRecorder.recordModel(sid, route.tier(), model.getModelName());
         dynamicModel.bindSessionModel(sid, model);
-        HarnessAgent hostAgent = sessionManager.getOrCreateAgent(sid, model);
+
+        String sysPrompt = buildHostSystemPrompt(uid);
+        ReActAgent hostAgent = hostAgentFactory.create(model, sysPrompt);
 
         RuntimeContext ctx = RuntimeContext.builder()
                 .userId(uid)
@@ -128,7 +161,7 @@ public class A2aHostServiceImpl implements IA2aHostService {
                 .streamEvents(new UserMessage(trimmed), ctx)
                 .mapNotNull(event -> {
                     hostTracer.onEvent(event);
-                    return mapEventToSseChunk(event);
+                    return mapEventToSseChunk(event, hostCtx);
                 })
                 .doOnNext(chunk -> {
                     if (log.isDebugEnabled()) {
@@ -166,6 +199,19 @@ public class A2aHostServiceImpl implements IA2aHostService {
                         traceRecorder.step(sid, "hitl-invalidate",
                                 "invalidated=" + invalidated
                                         + ", signal=" + signal);
+                    }
+                    // 正常完成与客户端断开都归档：断开时 Redis AgentState 已回写本轮消息，
+                    // 只在完成时归档会造成短期有、长期无的不一致
+                    if ((signal == SignalType.ON_COMPLETE || signal == SignalType.CANCEL)
+                            && queryPreprocessor != null) {
+                        queryPreprocessor.rememberTurn(
+                                sid,
+                                uid,
+                                trimmed,
+                                hostCtx.getLastEffectiveQueryOrDefault(trimmed),
+                                hostCtx.getLastDsl(),
+                                hostCtx.getHostAnswer(),
+                                hostCtx.resolveTurnType());
                     }
                     if (signal == SignalType.ON_COMPLETE) {
                         traceRecorder.finish(sid,
@@ -234,15 +280,34 @@ public class A2aHostServiceImpl implements IA2aHostService {
     }
 
     /**
-     * 将 AgentEvent 映射为 SSE 文本。
+     * 拼装含 PG 跨会话长期记忆（用户画像 + 近期会话摘要）的 Host 系统提示词。
+     */
+    private String buildHostSystemPrompt(String userId) {
+        if (memoryProfileService == null) {
+            return A2aHostPrompt.SYSTEM;
+        }
+        String longTermContext = memoryProfileService.buildHostLongTermMemoryContext(userId);
+        if (longTermContext == null || longTermContext.isBlank()) {
+            return A2aHostPrompt.SYSTEM;
+        }
+        return A2aHostPrompt.SYSTEM + "\n\n" + longTermContext;
+    }
+
+    /**
+     * 将 AgentEvent 映射为 SSE 文本，并累积 Host 自然语言回答。
      *
-     * @param event AgentScope 流式事件
+     * @param event   AgentScope 流式事件
+     * @param hostCtx Host 聊天上下文
      * @return SSE 文本；无关事件返回 null
      */
-    private String mapEventToSseChunk(AgentEvent event) {
+    private String mapEventToSseChunk(AgentEvent event, A2aHostChatContext hostCtx) {
         if (event instanceof TextBlockDeltaEvent delta) {
             String text = delta.getDelta();
-            return (text == null || text.isEmpty()) ? null : text;
+            if (text == null || text.isEmpty()) {
+                return null;
+            }
+            hostCtx.appendHostAnswer(text);
+            return text;
         }
         if (event instanceof ToolCallStartEvent toolCall) {
             String name = toolCall.getToolCallName();

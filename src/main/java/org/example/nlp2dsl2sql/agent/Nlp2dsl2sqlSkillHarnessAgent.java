@@ -4,25 +4,27 @@ import io.agentscope.core.skill.repository.ClasspathSkillRepository;
 import io.agentscope.core.tool.Toolkit;
 import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import io.agentscope.harness.agent.HarnessAgent;
-import io.agentscope.harness.agent.memory.compaction.CompactionConfig;
 import lombok.extern.slf4j.Slf4j;
+import org.example.nlp2dsl2sql.service.memory.impl.SpringRedisAgentStateStore;
 import org.example.nlp2dsl2sql.tools.AgentToolRegistry;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.io.IOException;
-import java.nio.file.Paths;
 
 /**
  * HarnessAgent + Classpath Skill + SkillToolGroup 配置。
  * <p>
  * 业务工具挂在 {@code nlp2sql_query} 对应的 SkillToolGroup 上：
- * Agent 加载该 skill 后工具组才激活；会话记忆依赖 RuntimeContext 的
- * userId / sessionId。
+ * Agent 加载该 skill 后工具组才激活；彻底禁用本地 Workspace 文件记忆，
+ * 短期会话记忆统一由 {@link SpringRedisAgentStateStore} 按 RuntimeContext(userId, sessionId) 托管。
  */
 @Slf4j
 @Configuration
 public class Nlp2dsl2sqlSkillHarnessAgent {
+
+    /** Agent 名，同时作为 Redis 状态键命名空间 */
+    public static final String AGENT_NAME = "nlp2dsl2sqlSkillAgent";
 
     /** 与 SKILL.md frontmatter name 一致 */
     public static final String SKILL_NLP2SQL_QUERY = "nlp2sql-query";
@@ -57,13 +59,15 @@ public class Nlp2dsl2sqlSkillHarnessAgent {
      *
      * @param model        LLM
      * @param toolRegistry 业务 @Tool 注册表
+     * @param stateStore   Redis 短期会话状态存储
      * @return HarnessAgent
      * @throws IOException Classpath skill 加载失败
      */
     @Bean(name = "nlp2dsl2sqlSkillAgent")
     public HarnessAgent nlp2dsl2sqlSkillHarnessAgent(
             OpenAIChatModel model,
-            AgentToolRegistry toolRegistry) throws IOException {
+            AgentToolRegistry toolRegistry,
+            SpringRedisAgentStateStore stateStore) throws IOException {
         Toolkit toolkit = new Toolkit();
         // 默认不激活：仅当加载 nlp2sql_query skill 后激活
         toolkit.createSkillToolGroup(
@@ -81,25 +85,29 @@ public class Nlp2dsl2sqlSkillHarnessAgent {
         log.info("Classpath skills loaded: {}", skillRepo.getAllSkillNames());
 
         return HarnessAgent.builder()
-                .name("nlp2dsl2sqlSkillAgent")
+                .name(AGENT_NAME)
                 .sysPrompt(SKILL_HARNESS_PROMPT)
                 .model(model)
                 .toolkit(toolkit)
                 .skillRepository(skillRepo)
                 .maxIters(20)
-                .workspace(Paths.get(".agentscope/workspace"))
+                // 按 Agent 名隔离 Redis 状态键，避免与同 sessionId 的 Host/ReAct 模式互相恢复消息
+                .stateStore(stateStore.forAgent(AGENT_NAME))
                 // SSE 中断时会话可能残留未完成的 tool_call；开启后自动补错误结果继续对话。
                 .enablePendingToolRecovery(true)
+                // 彻底禁用本地 Workspace 文件与本地记忆钩子，统一走 Redis AgentStateStore
                 .disableFilesystemTools()
                 .disableShellTool()
+                .disableMemoryTools()
+                .disableMemoryHooks()
+                .disableSessionPersistence()
+                .disableWorkspaceContext()
+                .disableCompaction()
                 .disableSubagents()
                 .disableDynamicSubagents()
                 .disableDefaultWorkspaceSkills()
-                // 保留 memory hooks / session persistence，支持多轮记忆
-                .compaction(CompactionConfig.builder()
-                        .triggerMessages(30)
-                        .keepMessages(10)
-                        .build())
+                .disableAtPathExpansion()
+                .disableToolsConfig()
                 .build();
     }
 }

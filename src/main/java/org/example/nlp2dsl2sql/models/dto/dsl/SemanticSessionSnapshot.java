@@ -8,10 +8,10 @@ import lombok.NoArgsConstructor;
 import java.time.Instant;
 
 /**
- * 单轮问数语义快照（用于会话级多轮追问消歧）。
+ * 单轮问数语义快照与轮次流水记录（用于会话级多轮追问消歧与最近轮次查看）。
  * <p>
- * 只保留改写下一轮问句真正需要的信息：上一轮问句 + 语义 DSL。
- * 查询结果、SQL、富化 DSL 一律不入快照——复用历史行集回答等于返回过期数据。
+ * 快照槽位（snapshot）用于改写下一轮问句（上一轮问句 + 语义 DSL）；
+ * 轮次流水（turns）额外保留截断后的自然语言回答结论与轮次类型（SQL / SOP / MIXED / CHITCHAT）。
  */
 @Data
 @Builder
@@ -25,8 +25,14 @@ public class SemanticSessionSnapshot {
     /** 上下文补全/改写后的自包含问题 */
     private String effectiveQuestion;
 
-    /** 语义 DSL */
+    /** 语义 DSL（仅 SQL 查询成功时非空） */
     private SemanticQueryDSL dsl;
+
+    /** 截断后的回答结论（最多 memory.answer-max-chars 字） */
+    private String answer;
+
+    /** 轮次类型：SQL / SOP / MIXED / CHITCHAT */
+    private String turnType;
 
     /** 生成时间戳 */
     private Instant timestamp;

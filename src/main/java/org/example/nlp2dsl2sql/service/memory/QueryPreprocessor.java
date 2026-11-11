@@ -1,21 +1,26 @@
 package org.example.nlp2dsl2sql.service.memory;
 
 import lombok.extern.slf4j.Slf4j;
+import org.example.nlp2dsl2sql.config.MemoryProperties;
 import org.example.nlp2dsl2sql.models.dto.dsl.SemanticQueryDSL;
 import org.example.nlp2dsl2sql.models.dto.dsl.SemanticSessionSnapshot;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 
 /**
- * 会话多轮记忆的唯一入口：读侧做追问消歧，写侧沉淀语义快照。
+ * 会话多轮记忆的唯一入口：读侧做追问消歧，写侧沉淀语义快照与全量轮次归档。
  * <p>
  * 五种编排形态（V2 固定管线 / ReAct / Skill / Planner / A2A Host）共用同一份
  * 快照，因为它们共享同一套 DSL 生成工具与提示词，产物是模式无关的。
  * <p>
- * 快照存储由 {@link SessionSnapshotStore} 抽象（当前为 Redis 实现，重启不失忆）；
- * 与 AgentScope 内置 memory 的分工：本类只负责确定性的追问改写；
- * 用户画像、能力边界这类开放式记忆仍由 HarnessAgent 自行 flush 到 MEMORY.md。
+ * 职责切分：
+ * <ul>
+ *   <li>{@link #rememberSnapshotOnly}：仅在 SQL 子查询产出 DSL 时更新 Redis {@code snapshot} 键，
+ *       确保复合问题内的后续 SQL 子问题或下一轮追问立即继承，且不被 SOP/闲聊覆盖；</li>
+ *   <li>{@link #rememberTurn}：在对话流完成时汇总「一问一答一轮」，有 DSL 时更新快照，并写穿 PG {@code memory_session_archive}。</li>
+ * </ul>
  */
 @Slf4j
 @Component
@@ -26,17 +31,40 @@ public class QueryPreprocessor {
     private final MemoryArchiveWriter archiveWriter;
     private final UserKeyResolver userKeyResolver;
     private final MemoryProfileService profileService;
+    private final MemoryProperties memoryProperties;
 
+    /**
+     * 兼容 5 参构造（仅供单测便捷构造）。
+     */
     public QueryPreprocessor(SessionSnapshotStore store,
                              QueryContextRewriter rewriter,
                              MemoryArchiveWriter archiveWriter,
                              UserKeyResolver userKeyResolver,
                              MemoryProfileService profileService) {
+        this(store, rewriter, archiveWriter, userKeyResolver, profileService, new MemoryProperties());
+    }
+
+    /**
+     * @param store            短期快照与轮次存储
+     * @param rewriter         追问改写器
+     * @param archiveWriter    PG 流水异步写穿器
+     * @param userKeyResolver  userId 派生器
+     * @param profileService   长期画像读取服务
+     * @param memoryProperties 记忆配置
+     */
+    @Autowired
+    public QueryPreprocessor(SessionSnapshotStore store,
+                             QueryContextRewriter rewriter,
+                             MemoryArchiveWriter archiveWriter,
+                             UserKeyResolver userKeyResolver,
+                             MemoryProfileService profileService,
+                             MemoryProperties memoryProperties) {
         this.store = store;
         this.rewriter = rewriter;
         this.archiveWriter = archiveWriter;
         this.userKeyResolver = userKeyResolver;
         this.profileService = profileService;
+        this.memoryProperties = memoryProperties != null ? memoryProperties : new MemoryProperties();
     }
 
     /**
@@ -94,43 +122,86 @@ public class QueryPreprocessor {
     }
 
     /**
-     * 写侧：沉淀本轮语义快照。
-     * <p>
-     * dsl 为 null 表示本轮没走到 DSL 生成（意图非业务、检索无候选、Agent 提前
-     * 回答、用户中途放弃），此时没有可继承的语义槽位，不覆盖上一轮快照。
+     * 仅更新 Redis 最新语义 DSL 快照（供 A2aSqlHitlRunner 在 SQL 子查询成功产出 DSL 时立即更新，不记轮次流水）。
      *
-     * @param sessionId       会话 ID
-     * @param rawQuestion     用户原始问句
-     * @param effectiveQuestion 经 {@link #preprocess} 补全后的问句
-     * @param dsl             本轮语义 DSL，可为 null
+     * @param sessionId         会话 ID
+     * @param rawQuestion       子问题原文
+     * @param effectiveQuestion 追问补全后的生效子问题
+     * @param dsl               本轮生成的语义 DSL
      */
-    public void remember(String sessionId, String rawQuestion, String effectiveQuestion,
-                         SemanticQueryDSL dsl) {
-        remember(sessionId, null, rawQuestion, effectiveQuestion, dsl);
-    }
-
-    /**
-     * 写侧：沉淀本轮语义快照并异步写穿 PG 流水（长期记忆原料）。
-     *
-     * @param sessionId       会话 ID
-     * @param userId          归属用户 ID，可为 null（按 sessionId 派生）
-     * @param rawQuestion     用户原始问句
-     * @param effectiveQuestion 经补全后的问句
-     * @param dsl             本轮语义 DSL，可为 null
-     */
-    public void remember(String sessionId, String userId, String rawQuestion,
-                         String effectiveQuestion, SemanticQueryDSL dsl) {
+    public void rememberSnapshotOnly(
+            String sessionId, String rawQuestion, String effectiveQuestion,
+            SemanticQueryDSL dsl) {
         if (sessionId == null || sessionId.isBlank() || dsl == null) {
             return;
         }
-        store.put(sessionId, SemanticSessionSnapshot.builder()
+        store.putSnapshot(sessionId.trim(), SemanticSessionSnapshot.builder()
                 .question(rawQuestion)
                 .effectiveQuestion(effectiveQuestion)
                 .dsl(dsl)
+                .turnType("SQL")
                 .timestamp(Instant.now())
                 .build());
-        archiveWriter.writeAsync(sessionId.trim(),
-                userKeyResolver.resolve(sessionId, userId),
-                rawQuestion, effectiveQuestion, dsl);
+    }
+
+    /**
+     * 写侧：汇总完整一轮问答，有 DSL 时更新语义快照，并异步写穿 PG 归档表。
+     *
+     * @param sessionId         会话 ID
+     * @param userId            归属用户 ID（可为 null，按 sessionId 派生）
+     * @param rawQuestion       用户原始问句
+     * @param effectiveQuestion 经补全后的问句
+     * @param dsl               本轮语义 DSL（非 SQL 轮次可为 null，为 null 时不覆盖上一轮 snapshot）
+     * @param answer            本轮自然语言回答结论（自动按 memory.answer-max-chars 截断）
+     * @param turnType          轮次类型（SQL / SOP / MIXED / CHITCHAT）
+     */
+    public void rememberTurn(
+            String sessionId, String userId,
+            String rawQuestion, String effectiveQuestion,
+            SemanticQueryDSL dsl, String answer, String turnType) {
+        if (sessionId == null || sessionId.isBlank()
+                || rawQuestion == null || rawQuestion.isBlank()) {
+            return;
+        }
+        String sid = sessionId.trim();
+        String resolvedUserId = userKeyResolver.resolve(sid, userId);
+        String truncatedAnswer = truncateAnswer(answer);
+        String resolvedTurnType = (turnType == null || turnType.isBlank())
+                ? (dsl != null ? "SQL" : "CHITCHAT")
+                : turnType;
+        String effQ = (effectiveQuestion == null || effectiveQuestion.isBlank())
+                ? rawQuestion
+                : effectiveQuestion;
+
+        SemanticSessionSnapshot turn = SemanticSessionSnapshot.builder()
+                .question(rawQuestion)
+                .effectiveQuestion(effQ)
+                .dsl(dsl)
+                .answer(truncatedAnswer)
+                .turnType(resolvedTurnType)
+                .timestamp(Instant.now())
+                .build();
+
+        if (dsl != null) {
+            store.putSnapshot(sid, turn);
+        }
+        archiveWriter.writeAsync(
+                sid, resolvedUserId, rawQuestion, effQ,
+                dsl, truncatedAnswer, resolvedTurnType);
+    }
+
+    /**
+     * 回答超长时保留结尾：流式回答常以"我来帮你查询一下…"之类开场白起头，结论在后面。
+     */
+    private String truncateAnswer(String answer) {
+        if (answer == null || answer.isBlank()) {
+            return null;
+        }
+        String trimmed = answer.trim();
+        int maxChars = memoryProperties.getAnswerMaxChars();
+        if (maxChars > 0 && trimmed.length() > maxChars) {
+            return trimmed.substring(trimmed.length() - maxChars);
+        }
+        return trimmed;
     }
 }

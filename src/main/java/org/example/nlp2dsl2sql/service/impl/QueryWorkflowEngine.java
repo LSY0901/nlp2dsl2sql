@@ -140,9 +140,23 @@ public class QueryWorkflowEngine implements IQueryWorkflowEngine {
                 plan = doReplan(ctx);
                 continue;
             }
-            queryPreprocessor.remember(sessionId, rawQuestion, question, ctx.getSemanticDSL());
-            return buildOutputFlux(ctx);
+            Flux<String> output = buildOutputFlux(ctx);
+            // 流正常结束后汇总一问一答落记忆（快照 + PG 归档），与其它编排形态口径一致
+            StringBuilder answer = new StringBuilder();
+            SemanticQueryDSL dsl = ctx.getSemanticDSL();
+            return output.doOnNext(answer::append)
+                    .doOnComplete(() -> queryPreprocessor.rememberTurn(
+                            sessionId, null, rawQuestion, question,
+                            dsl, lastAnswerSegment(answer.toString()), "SQL"));
         }
+    }
+
+    /**
+     * 输出流前半段是进度/意图/SQL 文本，结论在 "结论：" 之后；只截取结论部分入记忆。
+     */
+    private static String lastAnswerSegment(String full) {
+        int idx = full.lastIndexOf("结论：");
+        return idx >= 0 ? full.substring(idx + "结论：".length()) : full;
     }
 
     /**

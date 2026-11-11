@@ -6,7 +6,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 会话流水：每轮问数一行，写穿落库（长期记忆原料）。
+ * 会话流水：每轮对话一行，写穿落库（长期记忆压缩原料）。
  */
 @Data
 @TableName("memory_session_archive")
@@ -26,8 +26,14 @@ public class MemorySessionArchive {
     /** 上下文补全后的自包含问句 */
     private String effectiveQuestion;
 
-    /** 语义 DSL 的 fastjson2 序列化 */
+    /** 语义 DSL 的 fastjson2 序列化（非 SQL 轮次可空） */
     private String dslJson;
+
+    /** 截断后的回答结论 */
+    private String answer;
+
+    /** 轮次类型：SQL / SOP / MIXED / CHITCHAT */
+    private String turnType;
 
     /** 入库时间（DB 默认 now()） */
     private LocalDateTime createdAt;

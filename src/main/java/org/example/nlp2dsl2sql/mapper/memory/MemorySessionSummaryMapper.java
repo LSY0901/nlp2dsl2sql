@@ -39,4 +39,19 @@ public interface MemorySessionSummaryMapper extends BaseMapper<MemorySessionSumm
      */
     @Select("SELECT DISTINCT user_id FROM memory_session_summary WHERE user_id IS NOT NULL")
     List<String> selectDistinctUserIds();
+
+    /**
+     * 查询指定用户最近 N 条会话摘要（按摘要时间倒序，供 Host 启动时跨会话读回注入）。
+     */
+    @Select("""
+            SELECT id, session_id, user_id, summary, turn_count,
+                   first_turn_at, last_turn_at, summarized_at
+            FROM memory_session_summary
+            WHERE user_id = #{userId}
+            ORDER BY summarized_at DESC
+            LIMIT #{limit}
+            """)
+    List<MemorySessionSummary> selectRecentByUserId(
+            @Param("userId") String userId,
+            @Param("limit") int limit);
 }

@@ -16,12 +16,13 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * 用户画像定时任务：按 {@code summary_seen} 游标增量消化新摘要，
- * 用 fast 档 LLM 把"旧画像 + 新摘要"提炼成整份新画像（覆盖式）并 upsert PG。
+ * 用户画像定时任务：按 {@code id > summary_seen OR summarized_at > profile.updated_at}
+ * 增量消化新增或重新压缩的会话摘要，用 fast 档 LLM 把"旧画像 + 新摘要"提炼成整份新画像（覆盖式）并 upsert PG。
  * <p>
  * LLM 失败时保留旧画像（本轮跳过），下轮重试。
  */
@@ -82,17 +83,26 @@ public class MemoryProfileJob {
     }
 
     /**
-     * 增量刷新单个用户画像。
+     * 增量刷新单个用户画像（兼容同一 sessionId 增量重压缩导致的 summarized_at 更新）。
      */
     private void refreshOne(String userId) {
         MemoryUserProfile profile = profileMapper.selectById(userId);
         long seen = (profile == null || profile.getSummarySeen() == null)
                 ? 0L : profile.getSummarySeen();
-        List<MemorySessionSummary> fresh = summaryMapper.selectList(
-                new LambdaQueryWrapper<MemorySessionSummary>()
-                        .eq(MemorySessionSummary::getUserId, userId)
-                        .gt(MemorySessionSummary::getId, seen)
-                        .orderByAsc(MemorySessionSummary::getId));
+        LocalDateTime profileUpdatedAt = (profile == null) ? null : profile.getUpdatedAt();
+
+        LambdaQueryWrapper<MemorySessionSummary> query = new LambdaQueryWrapper<MemorySessionSummary>()
+                .eq(MemorySessionSummary::getUserId, userId);
+        if (profileUpdatedAt != null) {
+            query.and(w -> w.gt(MemorySessionSummary::getId, seen)
+                    .or()
+                    .gt(MemorySessionSummary::getSummarizedAt, profileUpdatedAt));
+        } else {
+            query.gt(MemorySessionSummary::getId, seen);
+        }
+        query.orderByAsc(MemorySessionSummary::getId);
+
+        List<MemorySessionSummary> fresh = summaryMapper.selectList(query);
         if (fresh == null || fresh.isEmpty()) {
             return;
         }
@@ -107,10 +117,17 @@ public class MemoryProfileJob {
             return;
         }
 
+        long maxId = seen;
+        for (MemorySessionSummary s : fresh) {
+            if (s.getId() != null && s.getId() > maxId) {
+                maxId = s.getId();
+            }
+        }
+
         MemoryUserProfile update = new MemoryUserProfile();
         update.setUserId(userId);
         update.setProfileJson(newProfileJson);
-        update.setSummarySeen(fresh.get(fresh.size() - 1).getId());
+        update.setSummarySeen(maxId);
         profileMapper.upsert(update);
         log.info("[MemoryProfile] 画像更新 userId={}, digested={}",
                 userId, fresh.size());

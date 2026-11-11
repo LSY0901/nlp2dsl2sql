@@ -94,6 +94,7 @@ public class A2aRemoteAgentTools {
             @ToolParam(name = "query", description = "子问题原文") String query,
             A2aHostChatContext hostCtx) {
         if (hostCtx != null) {
+            hostCtx.recordSopCall();
             traceRecorder.step(hostCtx.getSessionId(),
                     "call_sop_agent", query);
         }

@@ -131,10 +131,13 @@ public class A2aSqlHitlRunner {
             return "SQL Agent 调用失败: " + e.getMessage();
         }
 
-        // 查询成功且生成了 DSL，沉淀会话语义快照以支持多轮继承
+        // 记录 SQL 轮次轨迹；生成了 DSL 时立即更新 Redis snapshot（供同轮第二个 SQL 子问题或下一轮追问继承），
+        // 完整问答归档由 Host 在 ON_COMPLETE 时统一汇总写入 turns 与 memory_session_archive
+        hostCtx.recordSqlTurn(effectiveQuery, sqlSession.getDsl());
         if (sqlSession.getDsl() != null) {
-            queryPreprocessor.remember(sid, uid, query.trim(), effectiveQuery, sqlSession.getDsl());
-            log.info("[Multi-Turn] 已沉淀会话语义快照 sessionId={}, dslMetric={}",
+            queryPreprocessor.rememberSnapshotOnly(
+                    sid, query.trim(), effectiveQuery, sqlSession.getDsl());
+            log.info("[Multi-Turn] 已更新会话语义快照 sessionId={}, dslMetric={}",
                     sid, sqlSession.getDsl().getMetric());
         }
 
